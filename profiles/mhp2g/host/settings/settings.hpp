@@ -108,13 +108,13 @@ struct Settings {
     // The quest map shows without the Map item (camera/lock_on.hpp).
     bool always_map{false};
     // The item box's menu has a restock button (camera/lock_on.hpp).
-    bool restock{true};
+    bool restock{false};
     // The village peddler offers all rotations and three extra consumables.
     bool better_shop{false};
     bool key_quest_stars{false};
     bool capture_skull{false};
     // The item box's menu has the loadout buttons (game/loadouts.hpp).
-    bool loadouts{true};
+    bool loadouts{false};
     // Holding Select ends the wait after a quest is cleared; never during ad hoc play.
     bool quest_skip{false};
     // The game's button icons drawn as an Xbox pad's (gpu/texture_decode.hpp).

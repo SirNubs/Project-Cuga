@@ -108,7 +108,7 @@ bool SetupScreens::introduce(const fs::path &data_dir) {
             ImGui::Dummy({0.0f, font() * 0.3f});
             paragraph(std::string("Project Cuga plays ") + install::kGameTitle +
                 " from your own copy of the game. It needs the disc image of the game's PSP disc, " +
-                install::kDiscIdDisplay + ", as an .iso file: the PlayStation 3 release carries it.");
+                install::kDiscIdDisplay + ", as an .iso file. This build is tested with FUComplete.");
             ImGui::Dummy({0.0f, font() * 0.4f});
 #if defined(MHP2G_ANDROID_APP)
             paragraph("Choose the image next, in Android's file picker. Project Cuga copies it into its own storage (an "
@@ -134,7 +134,7 @@ bool SetupScreens::introduce(const fs::path &data_dir) {
             ImGui::Dummy({0.0f, font() * 0.4f});
             paragraph("You can also drop the .iso file onto this window.", colors::kTextDim);
 #endif
-            layer.set_description("Monster Hunter Portable 3rd HD Ver. (NPJB-40001) is the only release supported.");
+            layer.set_description("Tested with Monster Hunter Portable 2nd G (ULJM-05500) and FUComplete.");
             begin_footer();
             hints({{Control::Confirm, "Select"}, {Control::Back, "Quit"}});
             end_panel();

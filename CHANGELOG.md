@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-test.1 — 2026-10-24
+
+- Add a Windows x64 portable download with the required runtime DLLs and
+  compiled runtime overlays. Players supply their own matching ISO/FUCDAT.
+- Build in distribution mode, disabling debug tools and checkout-path fallback.
+- Correct inherited game/version wording on the first-run setup screen.
+- Start restock and incomplete loadouts disabled for new users. Other optional
+  quest/shop/map QOL additions are also disabled by default.
+- Include a prominent warning that loadouts are not yet fully functional.
+- Exclude personal settings, network identities, saves, cloud data and game files.
+
 ## Development source snapshot — 2026-10-24
 
 - Publish Project Cuga source with Project Poke and Yakumo attribution and
