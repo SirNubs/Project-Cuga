@@ -1,0 +1,10 @@
+{
+  "profiles/mhp3rd/host/audio/audio_sink.hpp": {
+    "sha256": "8567e9ef3cb07f9eba8fcd1a2bb24931dc1cea549d46b3af46cb9b3dacc45fbc",
+    "reason": "AudioSink method declarations have no standalone LLVM line map. Their out-of-line implementations and actual SDL output-gain behavior are covered by renderer/audio regression tests and remain subject to the normal diff gate."
+  },
+  "profiles/mhp3rd/host/settings/settings.hpp": {
+    "sha256": "2472ab73effdcc1f979768e6ef200c20755c4dcfd0228e3e3fa609e28657ff61",
+    "reason": "Settings declarations and member defaults have no standalone LLVM line map. Background option defaults, malformed input and serialization are tested in mhp3rd_settings_tests; menu/default-restoration behavior is covered by SDL/ImGui regressions."
+  }
+}

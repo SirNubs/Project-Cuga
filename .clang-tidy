@@ -1,0 +1,17 @@
+# Start with bounded correctness checks, not style or wholesale modernization.
+Checks: >-
+  -*,
+  bugprone-bool-pointer-implicit-conversion,
+  bugprone-dangling-handle,
+  bugprone-sizeof-container,
+  bugprone-sizeof-expression,
+  bugprone-stringview-nullptr,
+  bugprone-suspicious-memset-usage,
+  bugprone-use-after-move
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(^|/)(include/psprecomp|src|tests|profiles/mhp3rd/(host|tests))/'
+SystemHeaders: false
+FormatStyle: none
+# Includes sometimes retain tests/../third_party spelling; exclude ownership
+# explicitly rather than relying on a first-party prefix match alone.
+ExcludeHeaderFilterRegex: '(^|/)(third_party|generated)/'

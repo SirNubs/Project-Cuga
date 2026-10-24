@@ -1,0 +1,157 @@
+name: Project coverage
+
+on:
+  pull_request:
+  push:
+    branches: ['**', '!coverage-badges']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Project coverage and 80% diff (Linux Clang 18)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      badge: ${{ steps.badge.outputs.json }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install versioned coverage toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends clang-18 llvm-18 libclang-rt-18-dev ninja-build glslang-tools libvulkan-dev libavcodec-dev libavutil-dev pkg-config mesa-vulkan-drivers fonts-dejavu-core xvfb xauth libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev
+      - name: Install pinned Python coverage collector
+        run: make coverage-tools
+      - name: Set up Java for Android contract tests
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Run Android Java contracts with coverage
+        run: |
+          set -euo pipefail
+          source profiles/mhp3rd/packaging/linux/sources.sh
+          mkdir -p out/java-test-deps
+          curl --fail --location --retry 3 "$SDL3_URL" -o out/java-test-deps/sdl.tar.gz
+          echo "$SDL3_SHA256  out/java-test-deps/sdl.tar.gz" | sha256sum --check --strict
+          tar -xzf out/java-test-deps/sdl.tar.gz -C out/java-test-deps
+          make java-test SDL_SOURCE="$PWD/out/java-test-deps/SDL3-$SDL3_VERSION"
+      - name: Build the pinned SDL dependency for full application coverage
+        run: |
+          source profiles/mhp3rd/packaging/linux/sources.sh
+          cmake -S "out/java-test-deps/SDL3-$SDL3_VERSION" -B out/coverage-sdl -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON \
+            -DSDL_TESTS=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_X11=ON -DSDL_WAYLAND=OFF \
+            -DSDL_UNIX_CONSOLE_BUILD=ON \
+            -DCMAKE_INSTALL_PREFIX="$PWD/out/coverage-sdl/install"
+          cmake --build out/coverage-sdl --parallel 2
+          cmake --install out/coverage-sdl
+      - name: Measure coverage and enforce changed-line threshold
+        env:
+          COVERAGE_BASE: ${{ github.event.pull_request.base.sha || (github.event.forced && 'origin/main') || github.event.before || 'origin/main' }}
+        run: |
+          set -euo pipefail
+          drivers=(/usr/share/vulkan/icd.d/lvp_icd*.json)
+          if [ "${#drivers[@]}" -ne 1 ] || [ ! -f "${drivers[0]}" ]; then
+            echo "Expected exactly one Mesa software Vulkan driver" >&2
+            exit 1
+          fi
+          export VK_DRIVER_FILES="${drivers[0]}"
+          cmake -S . -B out/coverage -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_COMPILER=clang++-18 -DPSPRECOMP_COVERAGE=ON \
+            -DPSPRECOMP_PROFILE=mhp3rd -DPSPRECOMP_BUILD_TESTS=ON \
+            -DMHP3RD_RENDERER=ON -DMHP3RD_FFMPEG=system -DMHP3RD_RENDERER_TESTS=ON \
+            -DCMAKE_PREFIX_PATH="$PWD/out/coverage-sdl/install"
+          cmake --build out/coverage --target psp_recomp --parallel 2
+          export PSPRECOMP_TEST_RECOMP="$PWD/out/coverage/psp_recomp"
+          xvfb-run -a make project-coverage \
+            CMAKE_ARGS="-DMHP3RD_RENDERER=ON -DMHP3RD_FFMPEG=system \
+            -DMHP3RD_RENDERER_TESTS=ON -DCMAKE_PREFIX_PATH=$PWD/out/coverage-sdl/install"
+      - name: Prepare measured-line coverage badge
+        id: badge
+        run: |
+          badge=$(jq -ce '
+            .measured_totals.percent as $percent
+            | if ($percent | type) == "number" and $percent >= 0 and $percent <= 100
+              then {schemaVersion: 1, label: "coverage", message: (($percent | tostring) + "%"),
+                    color: "b98335", labelColor: "2a1a22"}
+              else error("Invalid measured coverage percentage") end
+          ' out/project-coverage/summary.json)
+          printf 'json=%s\n' "$badge" >> "$GITHUB_OUTPUT"
+      - name: Publish coverage inventory
+        if: always()
+        run: |
+          if [ -f out/coverage/coverage-results/summary.md ]; then
+            cat out/coverage/coverage-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f out/project-coverage/summary.md ]; then
+            cat out/project-coverage/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload coverage reports and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: project-coverage
+          path: |
+            out/coverage/coverage-results/
+            out/python-coverage/
+            out/project-coverage/
+            out/java-coverage/report/
+            out/java-coverage/surefire-reports/
+            out/coverage/Testing/Temporary/*.log
+            out/coverage/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-badge:
+    name: Update main coverage badge
+    needs: coverage
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - name: Publish only the badge JSON to its data branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BADGE_JSON: ${{ needs.coverage.outputs.badge }}
+        run: |
+          set -euo pipefail
+          api="repos/$GH_REPO/git"
+          if parent=$(gh api "$api/ref/heads/coverage-badges" --jq .object.sha 2>/dev/null); then
+            if [[ ! "$parent" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Invalid badge parent commit" >&2
+              exit 1
+            fi
+          else
+            # gh can print an error JSON to stdout even when the request fails.
+            parent=""
+          fi
+          tree=$(jq -n --arg content "$BADGE_JSON" \
+            '{tree: [{path: "coverage.json", mode: "100644", type: "blob", content: $content}]}' \
+            | gh api --method POST "$api/trees" --input - --jq .sha)
+          commit=$(jq -n --arg tree "$tree" --arg parent "$parent" \
+            '{message: "Update measured main coverage badge", tree: $tree,
+              parents: (if $parent == "" then [] else [$parent] end)}' \
+            | gh api --method POST "$api/commits" --input - --jq .sha)
+          if [ -n "$parent" ]; then
+            gh api --method PATCH "$api/refs/heads/coverage-badges" -f sha="$commit" -F force=false
+          else
+            gh api --method POST "$api/refs" -f ref=refs/heads/coverage-badges -f sha="$commit"
+          fi

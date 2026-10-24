@@ -1,0 +1,42 @@
+name: Cppcheck
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'release/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cppcheck-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build pinned analyzer
+        run: python3 scripts/ci/install_cppcheck.py
+      - name: Configure public compilation database
+        run: >-
+          cmake -S . -B out/cppcheck -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DPSPRECOMP_PROFILE=mhp3rd -DPSPRECOMP_BUILD_TESTS=ON
+          -DMHP3RD_RENDERER=OFF -DMHP3RD_FFMPEG=OFF
+      - name: Analyze first-party sources
+        run: python3 scripts/ci/cppcheck.py
+      - name: Upload analysis diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cppcheck-diagnostics
+          path: out/cppcheck/cppcheck-results/
+          if-no-files-found: ignore
+          retention-days: 7

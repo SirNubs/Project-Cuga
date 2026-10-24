@@ -1,0 +1,87 @@
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'release/**']
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: c-cpp
+            build-mode: none
+          - language: java-kotlin
+            build-mode: manual
+          - language: python
+            build-mode: none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Prepare Android Java dependencies
+        if: matrix.language == 'java-kotlin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35'
+          source profiles/mhp3rd/packaging/linux/sources.sh
+          mkdir -p out/codeql-java/deps
+          curl --fail --location --retry 3 "$SDL3_URL" -o out/codeql-java/deps/sdl.tar.gz
+          echo "$SDL3_SHA256  out/codeql-java/deps/sdl.tar.gz" | sha256sum --check --strict
+          tar -xzf out/codeql-java/deps/sdl.tar.gz -C out/codeql-java/deps
+          python3 scripts/ci/android_java.py "$ANDROID_HOME/platforms/android-35/android.jar" \
+            "out/codeql-java/deps/SDL3-$SDL3_VERSION" out/codeql-java --stage sdl
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@7999b86c43a865dc79d8923397f35af22de63401 # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config: |
+            queries:
+              - uses: security-extended
+            threat-models: [local]
+
+      - name: Compile Yakumo Android Java
+        if: matrix.language == 'java-kotlin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          source profiles/mhp3rd/packaging/linux/sources.sh
+          python3 scripts/ci/android_java.py "$ANDROID_HOME/platforms/android-35/android.jar" \
+            "out/codeql-java/deps/SDL3-$SDL3_VERSION" out/codeql-java --stage app
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@7999b86c43a865dc79d8923397f35af22de63401 # v4
+        with:
+          category: /language:${{ matrix.language }}

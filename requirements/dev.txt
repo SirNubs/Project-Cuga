@@ -1,0 +1,2 @@
+# Keep this pin aligned with required-version in ruff.toml.
+ruff==0.16.10

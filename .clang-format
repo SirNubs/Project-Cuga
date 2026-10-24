@@ -1,0 +1,29 @@
+# Approved first-party C++ formatting policy; keep source changes mechanical.
+# Use clang-format 21.1.8; scripts/format_cpp.py enforces the exact version.
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+ContinuationIndentWidth: 4
+AlignAfterOpenBracket: DontAlign
+AlignOperands: DontAlign
+BracedInitializerIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+BreakBeforeBraces: Attach
+NamespaceIndentation: None
+AccessModifierOffset: -4
+PointerAlignment: Right
+ReferenceAlignment: Right
+DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+SortIncludes: Never
+SortUsingDeclarations: Never
+BreakStringLiterals: false
+IncludeBlocks: Preserve
+ReflowComments: false
+FixNamespaceComments: false
+InsertBraces: false
+QualifierAlignment: Leave

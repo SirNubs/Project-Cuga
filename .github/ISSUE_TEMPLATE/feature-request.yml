@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an improvement to Yakumo.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check existing requests first. Follow the [Code of Conduct](https://github.com/TeamGDB/Yakumo/blob/main/CODE_OF_CONDUCT.md).
+        Do not request pirated copies or builds bundled with game content.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Explain what you are trying to do and who would benefit.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      description: Describe the behavior you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Describe other approaches you have considered or currently use.
+  - type: textarea
+    id: context
+    attributes:
+      label: Platforms and additional context
+      description: Include relevant platforms, examples or constraints. Remove personal information and do not attach game data.

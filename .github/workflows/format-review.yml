@@ -1,0 +1,62 @@
+name: C++ formatting
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: format-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: C++ formatting check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned formatter wheels
+        run: >-
+          python -m pip install --only-binary=:all: --require-hashes -r scripts/requirements-format.txt
+
+      - name: Check the complete first-party scope
+        run: python scripts/format_cpp.py check --json
+
+      - name: Preview representative sources
+        run: python scripts/format_cpp.py report --samples --diff > out/format-review/samples.diff
+
+      - name: Summarize formatting check
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads(Path('out/format-review/baseline.json').read_text())
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f"clang-format {report['version']} policy: "
+                            f"{report['different']} of {report['checked']} tracked first-party files differ.\n\n"
+                            "All scoped first-party files must match the approved formatting policy. "
+                            "The artifact contains the source list and six representative sample diffs. "
+                            "Formatting differences and tool failures fail this job. No source files were changed.\n")
+
+      - name: Upload review artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: formatting-review
+          path: out/format-review/
+          if-no-files-found: error
+          retention-days: 7

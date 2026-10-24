@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a crash, regression or incorrect behavior.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check existing issues before reporting a bug. For smoke-test results, use Test report instead.
+        Do not attach game files, disc images or saves. Remove personal information from logs.
+        Report security vulnerabilities [privately](https://github.com/TeamGDB/Yakumo/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the exact release version or Git commit you tested.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Steam Deck
+        - Android
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: System and hardware
+      description: OS version, CPU, GPU and driver version when relevant. For Android, include the device model. Do not include device addresses or user names.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Describe the sequence and any relevant settings, mods or input devices.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: regression
+    attributes:
+      label: Last working version or commit
+      description: If this is a regression and you know a working version, include it here.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Include relevant console output with personal paths and other private information removed.
+      render: text
+  - type: textarea
+    id: captures
+    attributes:
+      label: Screenshots or additional context
+      description: Only include captures needed to demonstrate the problem. Do not attach game data or saves.

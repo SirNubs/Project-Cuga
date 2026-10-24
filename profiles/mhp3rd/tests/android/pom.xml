@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>io.github.teamgdb.yakumo</groupId>
+  <artifactId>android-public-tests</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <repositories>
+    <repository><id>google</id><url>https://dl.google.com/dl/android/maven2/</url></repository>
+  </repositories>
+  <dependencies>
+    <dependency>
+      <groupId>org.jacoco</groupId><artifactId>org.jacoco.agent</artifactId><version>0.8.15</version>
+      <classifier>runtime</classifier><scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.robolectric</groupId><artifactId>android-all</artifactId>
+      <version>15-robolectric-13954326</version><scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version><scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.robolectric</groupId><artifactId>robolectric</artifactId><version>4.17</version><scope>test</scope>
+    </dependency>
+  </dependencies>
+  <build>
+    <directory>${project.basedir}/../../../../out/java-coverage</directory>
+    <sourceDirectory>${project.basedir}/../../packaging/android/java</sourceDirectory>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId><version>3.6.1</version>
+        <executions><execution>
+          <id>external-sdl-java</id><phase>generate-sources</phase><goals><goal>add-source</goal></goals>
+          <configuration><sources><source>${sdl.source}/android-project/app/src/main/java</source></sources></configuration>
+        </execution></executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.1.0</version>
+        <executions><execution>
+          <id>android-test-aar-classes</id><phase>process-test-classes</phase><goals><goal>run</goal></goals>
+          <configuration><target>
+            <unzip src="${settings.localRepository}/androidx/test/monitor/1.8.0/monitor-1.8.0.aar"
+                   dest="${project.build.directory}/aar/monitor">
+              <patternset><include name="classes.jar"/></patternset>
+            </unzip>
+            <unzip src="${settings.localRepository}/androidx/test/espresso/espresso-idling-resource/3.7.0/espresso-idling-resource-3.7.0.aar"
+                   dest="${project.build.directory}/aar/idling">
+              <patternset><include name="classes.jar"/></patternset>
+            </unzip>
+          </target></configuration>
+        </execution></executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.6.0</version>
+        <configuration>
+          <forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
+          <additionalClasspathElements>
+            <additionalClasspathElement>${project.build.directory}/aar/monitor/classes.jar</additionalClasspathElement>
+            <additionalClasspathElement>${project.build.directory}/aar/idling/classes.jar</additionalClasspathElement>
+          </additionalClasspathElements>
+          <systemPropertyVariables>
+            <robolectric.dependency.repo.url>https://repo.maven.apache.org/maven2</robolectric.dependency.repo.url>
+            <jacoco-agent.destfile>${project.build.directory}/jacoco.exec</jacoco-agent.destfile>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>0.8.15</version>
+        <configuration><includes><include>io/github/teamgdb/yakumo/**</include></includes></configuration>
+        <executions>
+          <!-- Instrument original bytecode before Robolectric transforms it. -->
+          <execution><id>instrument</id><goals><goal>instrument</goal></goals></execution>
+          <execution><id>restore</id><goals><goal>restore-instrumented-classes</goal></goals></execution>
+          <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals>
+            <configuration><outputDirectory>${project.build.directory}/report</outputDirectory></configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

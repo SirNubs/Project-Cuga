@@ -1,0 +1,25 @@
+// Entry point of one overlay library, configured from the overlay's meta.txt by
+// profiles/mhp2g/CMakeLists.txt. Everything else in the library is psp_recomp
+// output carrying the @MHP2G_OVERLAY_PREFIX@ symbol prefix.
+#define MHP2G_OVERLAY_MODULE 1
+#include "overlay_module.hpp"
+
+#include "psprecomp/runtime.hpp"
+
+namespace psprecomp {
+void register_@MHP2G_OVERLAY_PREFIX@_functions(Runtime &runtime);
+}
+
+namespace {
+
+constexpr mhp2g::OverlayModuleInfo kInfo{mhp2g::kOverlayAbiVersion, @MHP2G_OVERLAY_BASE@u,
+                                          @MHP2G_OVERLAY_SIZE@u, @MHP2G_OVERLAY_CODE_SIZE@u,
+                                          @MHP2G_OVERLAY_HASH@ull, "@MHP2G_OVERLAY_NAME@"};
+
+} // namespace
+
+const mhp2g::OverlayModuleInfo *mhp2g_overlay_info() { return &kInfo; }
+
+void mhp2g_register_overlay(psprecomp::Runtime &runtime) {
+    psprecomp::register_@MHP2G_OVERLAY_PREFIX@_functions(runtime);
+}

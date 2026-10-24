@@ -1,0 +1,134 @@
+name: Unit tests
+
+on:
+  pull_request:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            generator: Ninja
+          - os: macos-14
+            generator: Ninja
+          - os: windows-2022
+            generator: Visual Studio 17 2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java for compiler contract tests
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure headless tests
+        run: >-
+          cmake -S . -B out/ci -G "${{ matrix.generator }}"
+          -DCMAKE_BUILD_TYPE=Debug
+          -DPSPRECOMP_PROFILE=mhp3rd
+          -DPSPRECOMP_BUILD_TESTS=ON
+          -DMHP3RD_RENDERER=OFF
+          -DMHP3RD_FFMPEG=OFF
+          -DPSPRECOMP_MSVC_MP_JOBS=1
+
+      - name: Build test executables
+        run: cmake --build out/ci --config Debug --target psprecomp_test_binaries -j2
+
+      - name: Test archive and overlay tools
+        run: |
+          python3 profiles/mhp3rd/tests/tool_security_tests.py
+          python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+
+      - name: Run tests
+        run: ctest --test-dir out/ci -C Debug --output-on-failure --no-tests=error --timeout 120 --output-junit test-results.xml
+
+      - name: Upload test diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-diagnostics-${{ matrix.os }}
+          path: |
+            out/ci/test-results.xml
+            out/ci/Testing/Temporary/*.log
+            out/ci/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  android:
+    name: Android (${{ matrix.abi }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, x86_64]
+    env:
+      NDK_VERSION: 28.2.13676358
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Android NDK
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION"'
+
+      - name: Configure Android headless tests
+        run: >-
+          cmake -S . -B out/android -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/$NDK_VERSION/build/cmake/android.toolchain.cmake"
+          -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-29
+          -DANDROID_STL=c++_shared -DCMAKE_BUILD_TYPE=Debug
+          -DPSPRECOMP_PROFILE=mhp3rd -DPSPRECOMP_BUILD_TESTS=ON
+          -DMHP3RD_RENDERER=OFF -DMHP3RD_FFMPEG=OFF
+
+      - name: Build Android test executables
+        run: cmake --build out/android --target psprecomp_test_binaries -j2
+
+      - name: Enable emulator hardware acceleration
+        if: matrix.abi == 'x86_64'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run native tests on Android 10
+        if: matrix.abi == 'x86_64'
+        uses: reactivecircus/android-emulator-runner@324029e2f414c084d8b15ba075288885e74aef9c # v2.34.0
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python3 scripts/ci/android_tests.py out/android "$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so"
+
+      - name: Upload Android diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-diagnostics-${{ matrix.abi }}
+          path: |
+            out/android/android-results/
+            out/android/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
+          retention-days: 7

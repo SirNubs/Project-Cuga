@@ -1,0 +1,21 @@
+# Start with correctness checks; Python formatting is a separate decision.
+required-version = "==0.16.10"
+target-version = "py39"
+force-exclude = true
+include = [
+    "scripts/**/*.py",
+    "profiles/mhp3rd/tools/**/*.py",
+    "profiles/mhp3rd/tests/**/*.py",
+]
+extend-exclude = [
+    "**/third_party/**",
+    "**/generated/**",
+    "**/game/**",
+    "**/overlays/**",
+    "out/**",
+    "build/**",
+    "dist/**",
+]
+
+[lint]
+select = ["F", "E9", "E722"]

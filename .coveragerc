@@ -1,0 +1,24 @@
+[run]
+branch = True
+relative_files = True
+data_file = out/python-coverage/.coverage
+source =
+    scripts
+    profiles/mhp3rd/tools
+patch = subprocess
+omit =
+    */test_*.py
+    */third_party/*
+    */generated/*
+    */game/*
+    */out/*
+
+[report]
+include_namespace_packages = True
+show_missing = True
+
+[json]
+output = out/python-coverage/coverage.json
+
+[html]
+directory = out/python-coverage/html

@@ -1,0 +1,9 @@
+# The script's tracked-file allowlist is authoritative. These exclusions also
+# protect direct clang-format file invocations in local checkouts.
+**/third_party/**
+**/generated/**
+**/game/**
+**/overlays/**
+**/overlay_corpora/**
+out/**
+build/**

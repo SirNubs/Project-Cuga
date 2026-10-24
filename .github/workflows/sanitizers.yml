@@ -1,0 +1,68 @@
+name: Native sanitizers
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'release/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sanitizers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sanitizers:
+    name: ASan + UBSan (Linux Clang 18)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:abort_on_error=0:exitcode=99
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1:abort_on_error=0:exitcode=98
+      ASAN_SYMBOLIZER_PATH: /usr/bin/llvm-symbolizer-18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install versioned Linux toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends clang-18 llvm-18 libclang-rt-18-dev ninja-build
+          clang++-18 --version
+          llvm-symbolizer-18 --version
+
+      - name: Configure instrumented headless tests
+        run: >-
+          cmake -S . -B out/sanitizers -G Ninja
+          -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_BUILD_TYPE=Debug
+          -DPSPRECOMP_SANITIZERS=ON -DPSPRECOMP_PROFILE=mhp3rd
+          -DPSPRECOMP_BUILD_TESTS=ON -DMHP3RD_RENDERER=OFF
+          -DMHP3RD_FFMPEG=OFF
+
+      - name: Verify instrumentation detects synthetic errors
+        run: python3 scripts/ci/check_sanitizers.py out/sanitizers
+
+      - name: Build instrumented native tests
+        run: cmake --build out/sanitizers --target psprecomp_test_binaries -j2
+
+      - name: Run complete headless CTest suite
+        run: >-
+          ctest --test-dir out/sanitizers --output-on-failure --no-tests=error
+          --timeout 120 --output-junit test-results.xml
+
+      - name: Upload sanitizer diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-sanitizer-diagnostics
+          path: |
+            out/sanitizers/test-results.xml
+            out/sanitizers/Testing/Temporary/*.log
+            out/sanitizers/CMakeFiles/CMakeConfigureLog.yaml
+            out/sanitizers/sanitizer-probes/*.log
+          if-no-files-found: ignore
+          retention-days: 7
