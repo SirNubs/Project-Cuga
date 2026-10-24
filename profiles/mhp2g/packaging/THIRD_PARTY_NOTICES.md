@@ -33,6 +33,9 @@ offer made by the Project Cuga maintainer.
 
 ## Game content
 
-Project Cuga does not distribute Monster Hunter Portable 2nd G game files,
-extracted assets, generated game code, or compiled game overlays.
-Users must provide their own legally obtained game files.
+The source repository does not distribute Monster Hunter Portable 2nd G game
+files, extracted assets, generated game-source corpora or compiled overlays.
+Windows binary releases include Cuga's native executable and compiled runtime
+overlay libraries, alongside dependency notices. They do not include original
+PSP executables, game images, extracted assets, saves or personal settings.
+Users must provide their own legally obtained game files and matching patch data.
