@@ -53,9 +53,29 @@ You must provide files from your own legally obtained copy of MHP2G, and apply
 the appropriate FUComplete patch yourself if using that setup. The native QOL
 features target the verified ULJM05500/FUComplete layout; other layouts may
 disable features or require additional work. A US/EU save import does not mean
-the US/EU executable is supported.
+the US/EU executable is supported by the FUC build. US requires the separate experimental download below; EU is unverified.
 
-## Windows download
+## Choose the correct game version
+
+| Version | Windows download | Testing status |
+| --- | --- | --- |
+| Japanese / FUComplete (FUC) | [FUC download](https://github.com/SirNubs/Project-Cuga/releases/tag/v0.1.0-test.1) | The more extensively tested Cuga build; still experimental. |
+| US MHFU, ULUS10391 v1.01 | [US experimental download](https://github.com/SirNubs/Project-Cuga/releases/tag/v0.1.0-us-test.1) | **HEAVILY UNTESTED compared with FUC.** Early Windows compatibility experiment. |
+
+> **US BUILD: HEAVILY UNTESTED.** Only limited offline testing on one PC has
+> been performed. Expect bugs and possible save problems; back up saves and use
+> a separate installation. Full-game, other-device, multiplayer/crossplay and
+> save-write/reload testing are incomplete. EU support is unverified.
+> **Loadouts are still not fully functional in either build.**
+
+Use the download matching your own game ISO. US files require the separate US
+build; the FUC download does not gain US support. The US source is on
+[`codex/us-experimental-release`](https://github.com/SirNubs/Project-Cuga/tree/codex/us-experimental-release);
+the default branch continues to contain the FUC implementation.
+The US package uses runtime interpreter fallback for overlays, which may have
+different performance from FUC. No US Android package is provided.
+
+## FUC Windows download
 
 Use the **[Windows portable download on the Releases page](https://github.com/SirNubs/Project-Cuga/releases)**
 to play without compiling. Download the Windows x64 portable ZIP from Assets,
