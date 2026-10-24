@@ -55,9 +55,26 @@ features target the verified ULJM05500/FUComplete layout; other layouts may
 disable features or require additional work. A US/EU save import does not mean
 the US/EU executable is supported.
 
-**Download ZIP gives you source, not a ready-to-play game.** Local game-derived
-code and overlay libraries must be generated during a developer build. A
-separate binary release is not included in this initial source upload.
+## Windows download
+
+Use the **[Windows portable download on the Releases page](https://github.com/SirNubs/Project-Cuga/releases)**
+to play without compiling. Download the Windows x64 portable ZIP from Assets,
+extract the entire folder and run **Cuga.exe**. First-run setup asks for your
+own **ULJM05500/FUComplete ISO**. You must also supply FUComplete's required
+FUCDAT support files from your own patch setup; see the ZIP's README.
+
+The download includes the native executable, compiled runtime overlay DLLs,
+SDL3, FFmpeg and the app-local Visual C++ runtime. It includes **no game image,
+original PSP executable, save, personal settings, nickname, network identity
+or cloud connection**. Optional quest/shop/map/restock/loadout QOL features
+start disabled. Loadouts are not yet fully functional and remain opt-in.
+
+The Windows package is an experimental test release. A Vulkan-capable GPU
+and current driver are required. Save progress stays in the portable folder;
+keep its data/game folders when updating.
+
+GitHub's green Code > Download ZIP button still downloads **source code**.
+Choose a release asset for the extract-and-run program.
 
 ## Building and running
 
