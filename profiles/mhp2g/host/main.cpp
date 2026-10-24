@@ -507,7 +507,7 @@ int main(int argc, char **argv) {
 #if defined(MHP2G_SET_MOTION_UNIT)
         mhp2g::game::prepare_motion_map(runtime, &psprecomp::MHP2G_SET_MOTION_UNIT);
 #endif
-        mhp2g::game::prepare_call_trace(runtime);
+        // Register the independently verified US map-availability function.
         mhp2g::camera::prepare_always_map(runtime);
         //if (sha256 == mhp2g::install::kExecutableSha256) (void)mhp2g::camera::prepare_game_aspect(runtime);
 // #if defined(MHP2G_CAMERA_HELPER_UNIT)

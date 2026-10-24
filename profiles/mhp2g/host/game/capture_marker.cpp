@@ -18,9 +18,9 @@ namespace psprecomp {
 
 namespace mhp2g::game {
 namespace {
-constexpr std::uint32_t kDrawMarker = 0x088446F4u;
-constexpr std::uint32_t kQuest = 0x09A5A580u;
-constexpr std::uint32_t kRatios = 0x09BB3D28u;
+constexpr std::uint32_t kDrawMarker = 0x08844744u;
+constexpr std::uint32_t kQuest = 0x09A5F300u;
+constexpr std::uint32_t kRatios = 0x09BB8BB8u;
 psprecomp::Runtime::RecompiledFunction original{};
 bool hooked{};
 std::vector<CaptureMarker> pending, shown;
@@ -31,7 +31,7 @@ bool supported(const psprecomp::GuestMemory &m) {
         m.load32(kQuest + 8u) == kQuest &&
         std::memcmp(m.raw_pointer(kQuest + 32u, sizeof(name)), name, sizeof(name)) == 0 &&
         m.load32(kDrawMarker) == 0x27BDFF70u && m.load32(kDrawMarker + 4u) == 0xAFBF001Cu &&
-        m.load32(0x09AD3620u) == 0x27BDFFE0u && m.load32(0x09AD3630u) == 0x908501E8u;
+        m.load32(0x09AD8458u) == 0x27BDFFE0u && m.load32(0x09AD8468u) == 0x908501E8u;
 }
 
 void draw_marker(psprecomp::Runtime &runtime, psprecomp::AllegrexContext &ctx) {

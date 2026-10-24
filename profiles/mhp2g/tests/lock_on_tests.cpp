@@ -15,16 +15,18 @@
 #include <iostream>
 #include <vector>
 
-namespace mhp3rd::settings {
+namespace mhp2g::settings {
 Settings &current() {
     static Settings settings;
     return settings;
 }
 }
 
+namespace mhp2g::game { std::string item_names(const psprecomp::GuestMemory &, const std::vector<std::uint32_t> &) { return {}; } }
+
 namespace {
-using namespace mhp3rd::camera;
-namespace game = mhp3rd::camera::lock_on_layout;
+using namespace mhp2g::camera;
+namespace game = mhp2g::camera::lock_on_layout;
 
 constexpr std::uint32_t helper = 0x08878B70u;
 constexpr std::uint32_t return_pc = 0x088E626Cu;
@@ -57,6 +59,7 @@ void place(psprecomp::GuestMemory &memory, std::uint32_t monster, float x, float
     write_float(memory, monster + game::kPosition + 4u, 0.0f);
     write_float(memory, monster + game::kPosition + 8u, z);
     memory.store16(monster + game::kHealth, static_cast<std::uint16_t>(health));
+    memory.store32(monster + game::kTraits, most > 0 ? game::kLarge : 0u);
     memory.store16(monster + game::kMostHealth, static_cast<std::uint16_t>(most));
     memory.store32(monster + game::kFlags, other_area ? 7u : 3u);
 }
@@ -75,8 +78,9 @@ struct Fixture {
     psprecomp::Runtime runtime{64u * 1024u * 1024u};
     psprecomp::AllegrexContext ctx{};
     Fixture() {
-        mhp3rd::settings::current() = {};
-        mhp3rd::settings::current().analog_camera = false;
+        mhp2g::settings::current() = {};
+        mhp2g::settings::current().analog_camera = false;
+        mhp2g::settings::current().lock_on = true;
         runtime.register_generated_unit(29u, 0x08878000u, 0x4000u, &original, nullptr);
         runtime.register_function(helper, &original, "recomp_unit_test");
         auto &memory = runtime.memory();
@@ -217,7 +221,7 @@ void test_lock_follows_and_lets_go() {
 
 void test_off_changes_nothing() {
     Fixture f;
-    mhp3rd::settings::current().lock_on = false;
+    mhp2g::settings::current().lock_on = false;
     auto &memory = f.runtime.memory();
     const auto *p = memory.raw_pointer(camera_address, 0x100u);
     const std::vector<std::uint8_t> before(p, p + 0x100u);
@@ -229,7 +233,7 @@ void test_off_changes_nothing() {
 }
 
 void test_binds() {
-    using namespace mhp3rd::input;
+    using namespace mhp2g::input;
     TapDetector tap;
     check(!tap.update(true, false), "nothing while held");
     check(tap.update(false, false), "a tap when let go alone");

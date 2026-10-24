@@ -23,7 +23,7 @@ class Runtime;
 //
 // ULJM05500 (also under the FUC patch), as read in a quest's memory:
 // - The quest's monsters, large and small, are a table of up to twenty
-//   pointers at 0x09C0D3C0 in the quest overlay's data; a monster that is
+//   pointers at 0x09C12240 in the quest overlay's data; a monster that is
 //   gone leaves an empty slot. Each object starts with its class pointer and
 //   keeps its position as three floats at +0x40 and its health (s16) at
 //   +0x2E4: 320 for a Giadrome, 89 for a Popo, and 0 for that Popo killed.
@@ -51,16 +51,17 @@ struct Vec3 {
 
 // What lock-on reads in the game. Exposed for tests, which build a stand-in.
 namespace lock_on_layout {
-inline constexpr std::uint32_t kTaskSlot = 0x09A5A580u; // the code overlay slot: "game_task.ovl" in a quest
-inline constexpr std::uint32_t kMonsterTable = 0x09C0D3C0u;
+inline constexpr std::uint32_t kTaskSlot = 0x09A5F300u; // the code overlay slot: "game_task.ovl" in a quest
+inline constexpr std::uint32_t kMonsterTable = 0x09C12240u;
 inline constexpr std::uint32_t kMonsterSlots = 20u;
 inline constexpr std::uint32_t kFlags = 0x04u;
 inline constexpr std::uint32_t kOtherArea = 0x4u;
 inline constexpr std::uint32_t kPosition = 0x40u;
 inline constexpr std::uint32_t kHealth = 0x2E4u;
+inline constexpr std::uint32_t kMostHealth = 0x41Eu;
 inline constexpr std::uint32_t kTraits = 0x27Cu;
 inline constexpr std::uint32_t kLarge = 0x40u;
-inline constexpr std::uint32_t kExtent = 0x2E8u;
+inline constexpr std::uint32_t kExtent = 0x420u;
 } // namespace lock_on_layout
 
 struct LockMonster {

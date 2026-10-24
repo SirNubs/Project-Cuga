@@ -22,73 +22,21 @@ if(MHP2G_GENERATED)
     endif()
     set_source_files_properties(${MHP2G_GENERATED} PROPERTIES COMPILE_OPTIONS "${MHP2G_GENERATED_OPTIONS}")
 
-    # The analog camera wraps the game's camera rotation helper, and main.cpp
-    # has to hand it the generated unit that helper was compiled into. Which
-    # unit that is depends on how the generator partitions the code, so read it
-    # from the corpus instead of naming it: a new partition then finds its own
-    # unit, and a corpus without the helper stops the build here rather than
-    # letting the camera call the wrong code in game.
-    set(MHP2G_CAMERA_HELPER_UNIT "")
+    # Resolve the verified US map-marker function's generated unit.
+    set(marker_lines "")
     foreach(unit IN LISTS MHP2G_GENERATED)
-        file(STRINGS "${unit}" hit REGEX "register_function\\(0x08878B70u, &recomp_unit_[0-9]+," LIMIT_COUNT 1)
-        if(hit)
-            string(REGEX MATCH "recomp_unit_[0-9]+" MHP2G_CAMERA_HELPER_UNIT "${hit}")
-            break()
-        endif()
+        file(STRINGS "${unit}" hits REGEX "register_function\\(0x08844744u, &recomp_unit_[0-9]+,")
+        foreach(hit IN LISTS hits)
+            string(REGEX MATCH "0x[0-9A-F]+u, &recomp_unit_[0-9]+" pair "${hit}")
+            string(REPLACE ", &" ", " pair "${pair}")
+            string(APPEND marker_lines "MHP2G_HUD_FUNCTION(${pair})\n")
+        endforeach()
     endforeach()
-    if(NOT MHP2G_CAMERA_HELPER_UNIT)
-        message(FATAL_ERROR "mhp2g: no generated unit registers the camera rotation helper 0x08878B70; "
-                            "regenerate the corpus from the supported executable, or update "
-                            "host/camera/game_camera.cpp if the helper has moved")
+    if(NOT marker_lines)
+        message(FATAL_ERROR "US map-marker entry is missing from the generated corpus")
     endif()
-    message(STATUS "mhp2g: camera rotation helper in ${MHP2G_CAMERA_HELPER_UNIT}")
-    # The motion replacement tool (host/game/motion_map.cpp) wraps the game's set-motion function the same way.
-    set(MHP2G_SET_MOTION_UNIT "")
-    foreach(unit IN LISTS MHP2G_GENERATED)
-        file(STRINGS "${unit}" hit REGEX "register_function\\(0x088D85BCu, &recomp_unit_[0-9]+," LIMIT_COUNT 1)
-        if(hit)
-            string(REGEX MATCH "recomp_unit_[0-9]+" MHP2G_SET_MOTION_UNIT "${hit}")
-            break()
-        endif()
-    endforeach()
-    message(STATUS "mhp2g: set-motion function in ${MHP2G_SET_MOTION_UNIT}")
-
-    # Hiding the HUD (host/gpu/game_hud.cpp) wraps the game's 2D functions the
-    # same way, so their units are read from the corpus too, in one pass.
-    set(MHP2G_HUD_FUNCTIONS
-        088446F4 08876874 088EA9B0 088EB07C 088EBF0C 088EC060 088EC0F8 088EC1F0 088EC2EC 088EC3E0
-        088EC63C 088ECB74 088ECC38 088ECCE4 088ECD9C 088ECE58)
-    list(JOIN MHP2G_HUD_FUNCTIONS "|" hud_pattern)
-    set(hud_lines "")
-    foreach(unit IN LISTS MHP2G_GENERATED)
-        file(STRINGS "${unit}" hits REGEX "register_function\\(0x(${hud_pattern})u, &recomp_unit_[0-9]+,")
-        foreach(hit IN LISTS hits)
-            string(REGEX MATCH "0x[0-9A-F]+u, &recomp_unit_[0-9]+" pair "${hit}")
-            string(REPLACE ", &" ", " pair "${pair}")
-            string(APPEND hud_lines "MHP2G_HUD_FUNCTION(${pair})\n")
-        endforeach()
-    endforeach()
     set(MHP2G_HUD_INC "${CMAKE_CURRENT_BINARY_DIR}/generated_hooks/hud_functions.inc")
-    file(CONFIGURE OUTPUT "${MHP2G_HUD_INC}" CONTENT "${hud_lines}" @ONLY)
-
-    # Layered armor (host/game/layered_armor_hook.cpp) stands in for the game's
-    # lookup of an armor part's model and wraps the hunter's load step, so
-    # their units are read from the corpus too.
-    set(MHP2G_LAYERED_FUNCTIONS 08869778 088A5564)
-    list(JOIN MHP2G_LAYERED_FUNCTIONS "|" layered_pattern)
-    set(layered_lines "")
-    foreach(unit IN LISTS MHP2G_GENERATED)
-        file(STRINGS "${unit}" hits REGEX "register_function\\(0x(${layered_pattern})u, &recomp_unit_[0-9]+,")
-        foreach(hit IN LISTS hits)
-            string(REGEX MATCH "0x[0-9A-F]+u, &recomp_unit_[0-9]+" pair "${hit}")
-            string(REPLACE ", &" ", " pair "${pair}")
-            string(APPEND layered_lines "MHP2G_LAYERED_FUNCTION(${pair})\n")
-        endforeach()
-    endforeach()
-    set(MHP2G_LAYERED_INC "${CMAKE_CURRENT_BINARY_DIR}/generated_hooks/layered_armor_functions.inc")
-    file(CONFIGURE OUTPUT "${MHP2G_LAYERED_INC}" CONTENT "${layered_lines}" @ONLY)
-    # A regenerated corpus with the same file names must be read again.
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${MHP2G_GENERATED})
+    file(CONFIGURE OUTPUT "${MHP2G_HUD_INC}" CONTENT "${marker_lines}" @ONLY)
 else()
     message(STATUS "mhp2g: no generated AOT units; run profiles/mhp2g/scripts/generate.sh")
     set(MHP2G_GENERATED host/generated_stub.cpp)
@@ -207,6 +155,7 @@ set(MHP2G_HOST_SOURCES
     host/game/loadouts.cpp
     host/game/better_shop.cpp
     host/game/key_quests.cpp
+    host/game/key_quest_archive.cpp
     host/game/capture_ready.cpp
     host/game/capture_marker.cpp
     host/gpu/game_hud.cpp
@@ -1139,3 +1088,10 @@ set_target_properties(mhp2g_qol_quest_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY 
 if(BUILD_TESTING)
     add_test(NAME mhp2g_qol_quest_tests COMMAND mhp2g_qol_quest_tests)
 endif()
+
+add_executable(mhp2g_us_quest_archive_tests tests/us_quest_archive_tests.cpp
+    host/game/key_quests.cpp host/game/key_quest_archive.cpp
+    host/mods/mhp2g_data_bin.cpp host/mods/file_overlay.cpp host/mods/mod_ini.cpp)
+target_include_directories(mhp2g_us_quest_archive_tests PRIVATE "${MHP2G_PROFILE_DIR}/host")
+set_target_properties(mhp2g_us_quest_archive_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+add_test(NAME mhp2g_us_quest_archive_tests COMMAND mhp2g_us_quest_archive_tests)

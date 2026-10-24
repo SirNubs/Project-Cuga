@@ -137,7 +137,7 @@ Inspection inspect(const std::filesystem::path &path) {
         std::string what = "\"" + name + "\" is ";
         what += title != sfo.end() && !title->second.empty() ? title->second + " (" + disc_id->second + ")"
                                                              : "disc " + disc_id->second;
-        what += ". Project Cuga supports only " + std::string(kGameTitle) + ", the Japanese release with disc id " +
+        what += ". Project Cuga supports only " + std::string(kGameTitle) + ", the US release with disc id " +
             kDiscIdDisplay + ".";
         what += " Other releases and regions are not supported.";
         throw InstallError(what);
@@ -154,6 +154,9 @@ Inspection inspect(const std::filesystem::path &path) {
     // against and nothing to decrypt. The recompiled code must have been made from that same file.
     const bool plain_elf = result.eboot_bin.size() > 4u && result.eboot_bin[0] == 0x7Fu &&
         result.eboot_bin[1] == 'E' && result.eboot_bin[2] == 'L' && result.eboot_bin[3] == 'F';
+    // This US profile recompiles the verified plain BOOT.BIN from the user's disc.
+    if (!plain_elf || psprecomp::sha256_bytes(result.eboot_bin) != kExecutableSha256)
+        throw InstallError("The US executable does not match the tested ULUS-10391 version.");
     if (!plain_elf && psprecomp::sha256_bytes(result.eboot_bin) != kEncryptedExecutableSha256)
         throw InstallError("\"" + name + "\" is " + kGameTitle + " (" + kDiscIdDisplay +
             "), but its executable is not the version Project Cuga supports. The image may be patched, "

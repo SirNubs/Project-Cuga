@@ -97,12 +97,12 @@ struct Settings {
     // is pushed, instead of the game's fixed-speed turn and vertical presets.
     // On by default. Off writes nothing at all, so the camera is exactly as
     // the game made it.
-    bool analog_camera{true};
+    bool analog_camera{false};
     // The Lock on bind turns the quest camera towards a large monster and
     // keeps it there (camera/lock_on.hpp). Nothing happens until the bind is
     // pressed; off, the bind does nothing at all.
-    bool lock_on{true};
-    bool lock_on_marker{true}; // a ring over the locked monster
+    bool lock_on{false};
+    bool lock_on_marker{false}; // a ring over the locked monster
     // Large monsters stay marked on the quest map (camera/lock_on.hpp).
     bool monster_map{false};
     // The quest map shows without the Map item (camera/lock_on.hpp).

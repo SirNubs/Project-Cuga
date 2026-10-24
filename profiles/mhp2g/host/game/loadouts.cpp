@@ -16,11 +16,11 @@ namespace mhp2g::game {
 namespace {
 
 // The player's data (camera/lock_on.hpp, restock): pouch and item box are (u16 item, s16 count) slots.
-constexpr std::uint32_t kPlayerData = 0x089C7508u;
+constexpr std::uint32_t kPlayerData = 0x089CC558u;
 constexpr std::uint32_t kPouch = 0x6AEA6u;
 constexpr std::uint32_t kBox = 0x3428u;
 constexpr std::uint32_t kBoxSlots = 1000u;
-constexpr std::uint32_t kItemTable = 0x0899A228u;
+constexpr std::uint32_t kItemTable = 0x0899D2A8u;
 constexpr std::uint32_t kItemSize = 24u;
 constexpr std::uint32_t kItems = 1400u;
 constexpr int kBoxStack = 99; // the most one slot of the box holds
@@ -183,7 +183,7 @@ std::string load(psprecomp::GuestMemory &memory, int index) {
 } // namespace
 
 std::string item_name(const psprecomp::GuestMemory &memory, std::uint32_t item) {
-    constexpr std::uint32_t kNames = 0x089D15ABu;
+    constexpr std::uint32_t kNames = 0x089D65ADu;
     constexpr std::uint32_t kNamesEnd = kNames + 0x8000u;
     const std::string fallback = "item " + std::to_string(item);
     // The list starts with the nameless item 0: four 0xFF bytes and dashes.

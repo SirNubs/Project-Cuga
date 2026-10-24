@@ -292,7 +292,7 @@ void drive_follow(
 
     // Lock-on (lock_on.hpp) aims the same angles while it holds a monster.
     std::optional<LockOnAim> lock;
-    if (false) { // MHP2G: mhp2g_yaw_frame() turns the camera for lock-on
+    if (state.prepared && lock_on_allowed()) { // Legacy hook; MHP2G uses the direct driver.
         LockOnCamera camera;
         camera.address = address;
         camera.yaw = memory.load16(address + kYawCurrent);
@@ -732,7 +732,7 @@ bool prepare_game_camera(psprecomp::Runtime &runtime, RotationFunction original)
     return true;
 }
 
-// MHP2G (ULJM05500, also under the FUC patch): the follow camera (0x09994BC0) keeps its yaw as
+// MHP2G (ULJM05500, also under the FUC patch): the follow camera (0x09998FC0) keeps its yaw as
 // two signed 16-bit angles, 65536 to the turn: the target at +128 and, at +130, the shown angle,
 // which the game eases a quarter of the way to the target each frame. A turn to the right lowers
 // the angle. The game's own turn (0x08887174) reads the camera's commands at +132, 0x80 left and
@@ -743,11 +743,11 @@ bool prepare_game_camera(psprecomp::Runtime &runtime, RotationFunction original)
 // target is corrected against near objects on every frame, and the camera bounces off them.
 // The driver therefore has the game turn (mhp2g_turn_buttons() presses the command) and takes
 // the difference between the game's fixed step and the wanted one off the target beforehand.
-constexpr std::uint32_t kMhp2gCamera = 0x09994BC0u;
-constexpr std::uint32_t kMhp2gLookAt = 0x09994BD0u;
-constexpr std::uint32_t kMhp2gYawTarget = 0x09994C40u;
-constexpr std::uint32_t kMhp2gYaw = 0x09994C42u;
-constexpr std::uint32_t kMhp2gCommands = 0x09994C44u;
+constexpr std::uint32_t kMhp2gCamera = 0x09998FC0u;
+constexpr std::uint32_t kMhp2gLookAt = 0x09998FD0u;
+constexpr std::uint32_t kMhp2gYawTarget = 0x09999040u;
+constexpr std::uint32_t kMhp2gYaw = 0x09999042u;
+constexpr std::uint32_t kMhp2gCommands = 0x09999044u;
 constexpr std::int32_t kMhp2gTurnStep = 1150;
 constexpr std::uint32_t kMhp2gLeft = 0x0080u;
 constexpr std::uint32_t kMhp2gRight = 0x0020u;
@@ -774,7 +774,7 @@ std::int32_t mhp2g_angle_difference(std::uint16_t to, std::uint16_t from) {
 
 // The camera's height. The game has five presets of eight floats each (height at +4, distance at
 // +8, look-at height at +16, field of view at +24) in a table the camera points to at +108: level
-// 1 to 4 follow its 32-byte header, level 0 comes after them. The level is at 0x09994A84 and the
+// 1 to 4 follow its 32-byte header, level 0 comes after them. The level is at 0x09998E84 and the
 // camera keeps a pointer to its preset at +112. Level 0 is the highest view and 4 the lowest; the
 // D-pad's Up goes towards 4. Each frame the game eases the camera towards the preset it points
 // to, so changing a preset's numbers moves the camera smoothly, with the game's own easing and
@@ -787,9 +787,9 @@ std::int32_t mhp2g_angle_difference(std::uint16_t to, std::uint16_t from) {
 // game's current level; the other four stay as they are. When the game changes the level itself
 // (the D-pad), the angle is taken from that preset and the one that was written gets its own
 // numbers back.
-constexpr std::uint32_t kMhp2gLevel = 0x09994A84u;
-constexpr std::uint32_t kMhp2gPresetTable = 0x09994C2Cu;
-constexpr std::uint32_t kMhp2gPreset = 0x09994C30u;
+constexpr std::uint32_t kMhp2gLevel = 0x09998E84u;
+constexpr std::uint32_t kMhp2gPresetTable = 0x0999902Cu;
+constexpr std::uint32_t kMhp2gPreset = 0x09999030u;
 constexpr std::uint32_t kMhp2gLevels = 5u;
 constexpr std::uint32_t kMhp2gPresetBytes = 32u;
 // The orbit: its radius and look-at height are those of the game's two middle presets (height
@@ -956,7 +956,8 @@ void mhp2g_yaw_frame(psprecomp::Runtime &runtime) {
 
 void game_camera_frame(psprecomp::Runtime &runtime) {
     ++state.frame;
-    mhp2g_yaw_frame(runtime);
+    // The MHP2G direct driver and legacy hook must not consume the same input.
+    if (!state.prepared) mhp2g_yaw_frame(runtime);
     trace_flip(runtime.memory());
     // A step taken off in advance that no aim update has put back: the aim
     // code and the camera did not run, so it goes back now.
@@ -965,7 +966,7 @@ void game_camera_frame(psprecomp::Runtime &runtime) {
     // who never taps pays nothing for lock-on either.
     if (!lock_on_allowed()) lock_on_release("");
     lock_on_frame(runtime.memory());
-    if (state.prepared && !state.hooked && option_on()) {
+    if (state.prepared && !state.hooked && (option_on() || (lock_on_allowed() && lock_on_wanted()))) {
         // Only ever at the game's flip, from an import: no generated frame is
         // live on the host stack, so the dispatch tables can change here.
         // A host registration disables this unit's direct-call shortcut, so the

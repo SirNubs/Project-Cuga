@@ -1,5 +1,10 @@
 # Known issues and testing limits
 
+- **US build: HEAVILY UNTESTED compared with FUComplete/FUC.** Limited offline
+  checks on one PC only. Keep separate installations and backup saves. Full-game,
+  save-write/reload, multiplayer/crossplay, audio and other-device testing remain
+  incomplete. EU executables are unverified. US overlays use interpreter fallback.
+
 - **Loadouts are experimental and not fully functional.** Saving, loading and
   restocking may not behave as expected. Verify pouch contents manually and
   keep backups. They are not a dependable automatic preparation workflow.

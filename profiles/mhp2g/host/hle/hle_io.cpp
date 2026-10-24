@@ -5,6 +5,7 @@
 #include "kernel/load_trace.hpp"
 #include "kernel/iso_image.hpp"
 #include "mods/mhp2g_mods.hpp"
+#include "mods/disc_read_overlay.hpp"
 
 #include "psprecomp/common.hpp"
 
@@ -217,7 +218,12 @@ void write_stat(
 // Reads a disc file at `offset` into it.
 std::size_t read_disc(const OpenFile &file, std::uint64_t offset, std::span<std::uint8_t> out) {
     if (file.archive && mods::serving()) return mods::read_data_bin(file.archive_offset + offset, out);
-    return io().disc->read(file.disc_offset + offset, out);
+    const auto absolute = file.disc_offset + offset;
+    const auto count = io().disc->read(absolute, out);
+    if (const auto archive = mods::data_bin_on_disc(); archive && mods::serving())
+        return mods::overlay_archive_read(absolute, out.first(count), archive->offset, archive->size,
+            [](std::uint64_t at, std::span<std::uint8_t> bytes) { return mods::read_data_bin(at, bytes); });
+    return count;
 }
 
 } // namespace

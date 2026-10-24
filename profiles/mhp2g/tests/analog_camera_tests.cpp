@@ -20,6 +20,8 @@ Settings &current() {
 }
 }
 
+namespace mhp2g::game { std::string item_names(const psprecomp::GuestMemory &, const std::vector<std::uint32_t> &) { return {}; } }
+
 namespace {
 using namespace mhp2g::camera;
 constexpr float frame_seconds = 1.0f / 30.0f;

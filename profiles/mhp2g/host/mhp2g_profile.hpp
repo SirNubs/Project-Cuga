@@ -34,11 +34,11 @@ void install_profile(psprecomp::Runtime &runtime, const psprecomp::Elf32Image &e
 // jump into one stops the runtime until that overlay has its own corpus.
 // The end of each slot is the start of the next one.
 inline constexpr std::uint32_t kOverlaySlots[] = {
-    0x09A5A580u, // *_task mode overlays
-    0x09C14280u, // demo_sub, game_sub
-    0x09D15100u, // em* monsters
-    0x09D5DF80u, // stage* overlays
-    0x09D5FF00u, // end of largest known final-slot image
+    0x09A5F300u, // US mode overlays, from the US ELF section table
+    0x09C19100u, // US game/demo sub
+    0x09D1A280u, // US monster overlays
+    0x09D63100u, // US stage overlays; verify against archive headers
+    0x09D65080u, // verified largest final-slot image end from US archive headers
 };
 
 } // namespace mhp2g

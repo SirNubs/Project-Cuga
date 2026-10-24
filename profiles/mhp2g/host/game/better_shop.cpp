@@ -10,16 +10,16 @@ namespace mhp2g::game {
 namespace {
 
 // ULJM05500/FUC: traced in the user's village overlay. The peddler's stock
-// getter at 0x09A7B530 indexes this pointer table with player data +0x44BD.
+// getter at 0x09A803C0 indexes this pointer table with player data +0x44BD.
 // All five lists end with u16 0xFFFF. Their contiguous data area is large
 // enough for their union plus three items, without touching the next shop.
-constexpr std::uint32_t kOverlay = 0x09A5A580u;
-constexpr std::uint32_t kGetter = 0x09A7B530u;
-constexpr std::uint32_t kPointers = 0x09B01D08u;
-constexpr std::uint32_t kStock = 0x09B015E8u;
-constexpr std::uint32_t kMenuUp = 0x09995250u;
+constexpr std::uint32_t kOverlay = 0x09A5F300u;
+constexpr std::uint32_t kGetter = 0x09A803C0u;
+constexpr std::uint32_t kPointers = 0x09B070D0u;
+constexpr std::uint32_t kStock = 0x09B069B0u;
+constexpr std::uint32_t kMenuUp = 0x09999650u;
 constexpr std::array<std::uint32_t, 5> kLists{
-    0x09B015E8u, 0x09B01658u, 0x09B01698u, 0x09B016D8u, 0x09B01710u};
+    0x09B069B0u, 0x09B06A20u, 0x09B06A60u, 0x09B06AA0u, 0x09B06AD8u};
 constexpr std::array<std::size_t, 5> kLengths{53u, 31u, 31u, 27u, 27u};
 constexpr std::array<std::uint16_t, 5> kFirst{43u, 164u, 25u, 163u, 163u};
 constexpr std::array<std::uint16_t, 3> kAdded{8u, 65u, 66u}; // Mega Potion, Flash Bomb, Sonic Bomb
@@ -32,8 +32,8 @@ bool supported(const psprecomp::GuestMemory &memory) {
         memory.raw_pointer(kMenuUp, 4u) != nullptr &&
         memory.load32(kOverlay) == 0x336F574Du && memory.load32(kOverlay + 8u) == kOverlay &&
         std::memcmp(memory.raw_pointer(kOverlay + 32u, sizeof(name)), name, sizeof(name)) == 0 &&
-        memory.load32(kGetter) == 0x3C02089Cu && memory.load32(kGetter + 4u) == 0x8C427508u &&
-        memory.load32(kGetter + 0x28u) == 0x24421D08u && memory.load32(kGetter + 0x34u) == 0x8C420000u;
+        memory.load32(kGetter) == 0x3C02089Du && memory.load32(kGetter + 4u) == 0x8C42C558u &&
+        memory.load32(kGetter + 0x28u) == 0x244270D0u && memory.load32(kGetter + 0x34u) == 0x8C420000u;
 }
 
 bool pointers_match(const psprecomp::GuestMemory &memory, bool merged) {

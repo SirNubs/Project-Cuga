@@ -32,8 +32,8 @@ constexpr std::string_view kQuestOverlay = "game_task.ovl";
 // major. Found in a dump: the view takes the camera's eye (0x09994BC0) to the
 // origin, the projection is a perspective of 480/272's shape with the near
 // plane at 30.
-constexpr std::uint32_t kViewMatrix = 0x09995630u;
-constexpr std::uint32_t kProjection = 0x09995670u;
+constexpr std::uint32_t kViewMatrix = 0x09999A30u;
+constexpr std::uint32_t kProjection = 0x09999A70u;
 
 // Farther than this from the camera's look-at point, horizontally, a lock
 // lets go: well past what the camera can frame. Areas are a few thousand
@@ -144,7 +144,8 @@ std::vector<LockMonster> lock_on_monsters(const psprecomp::GuestMemory &memory) 
         const std::uint32_t at = memory.load32(kMonsterTable + slot * 4u);
         if (at < 0x08800000u || memory.raw_pointer(at, kExtent) == nullptr) continue;
         const auto health = static_cast<std::int16_t>(memory.load16(at + kHealth));
-        if (health <= 0) continue; // not spawned yet, or dead
+        const auto maximum = static_cast<std::int16_t>(memory.load16(at + kMostHealth));
+        if (health <= 0 || maximum <= 0 || health > maximum) continue; // dead, non-monster or invalid
         if ((memory.load32(at + kFlags) & kOtherArea) != 0u) continue;
         const Vec3 position = load_vec(memory, at + kPosition);
         if (!finite(position)) continue;
@@ -355,7 +356,7 @@ std::optional<std::array<float, 2>> lock_on_marker(const psprecomp::GuestMemory 
 }
 
 namespace {
-constexpr std::uint32_t kHasMap = 0x08844604u;
+constexpr std::uint32_t kHasMap = 0x08844654u;
 psprecomp::Runtime::RecompiledFunction has_map_original{};
 bool known_executable = false; // the addresses of these features hold
 std::atomic<bool> restock_wanted{false};
@@ -382,10 +383,10 @@ void prepare_always_map(psprecomp::Runtime &runtime) {
 }
 
 bool restock_offered(const psprecomp::GuestMemory &memory) {
-    constexpr std::uint32_t kMenuNumber = 0x09B0AC38u;
-    constexpr std::uint32_t kMenuUp = 0x09B0AC40u;
-    constexpr std::uint32_t kInMenu = 0x09995250u;
-    constexpr std::uint32_t kBoxScreen = 0x09B154F8u;
+    constexpr std::uint32_t kMenuNumber = 0x09B100C0u;
+    constexpr std::uint32_t kMenuUp = 0x09B100C8u;
+    constexpr std::uint32_t kInMenu = 0x09999650u;
+    constexpr std::uint32_t kBoxScreen = 0x09B1A980u;
     constexpr std::uint32_t kItemBoxMenu = 24u;
     if (!known_executable || on_quest(memory)) return false;
     for (const std::uint32_t at : {kMenuNumber, kMenuUp, kInMenu, kBoxScreen})
@@ -395,12 +396,12 @@ bool restock_offered(const psprecomp::GuestMemory &memory) {
 }
 
 std::string restock_frame(psprecomp::GuestMemory &memory, bool pressed) {
-    constexpr std::uint32_t kPlayerData = 0x089C7508u;
+    constexpr std::uint32_t kPlayerData = 0x089CC558u;
     constexpr std::uint32_t kPouch = 0x6AEA6u;
     constexpr std::uint32_t kPouchSlots = 24u;
     constexpr std::uint32_t kBox = 0x3428u;
     constexpr std::uint32_t kBoxSlots = 1000u;
-    constexpr std::uint32_t kItemTable = 0x0899A228u;
+    constexpr std::uint32_t kItemTable = 0x0899D2A8u;
     constexpr std::uint32_t kItemSize = 24u;
     constexpr std::uint32_t kItems = 1400u;
     // For scripted tests: MHP2G_TEST_RESTOCK=<file>; when that file appears, it is removed and a restock is asked for.
@@ -444,8 +445,8 @@ std::string restock_frame(psprecomp::GuestMemory &memory, bool pressed) {
 }
 
 void monster_map_frame(psprecomp::GuestMemory &memory, bool on) {
-    constexpr std::uint32_t kHunter = 0x090AF180u;
-    constexpr std::uint32_t kQuestHunterClass = 0x089B6378u;
+    constexpr std::uint32_t kHunter = 0x090B3580u;
+    constexpr std::uint32_t kQuestHunterClass = 0x089BB3CCu;
     constexpr std::uint32_t kPsychoserum = 0x62Au;
     static bool kept = false;
     const bool there = on_quest(memory) && memory.raw_pointer(kHunter, kPsychoserum + 1u) != nullptr &&
@@ -461,7 +462,7 @@ void monster_map_frame(psprecomp::GuestMemory &memory, bool on) {
 }
 
 void quest_skip_frame(psprecomp::GuestMemory &memory, bool allowed, bool select_held) {
-    constexpr std::uint32_t kReturnCountdown = 0x09A02210u;
+    constexpr std::uint32_t kReturnCountdown = 0x09A06610u;
     constexpr unsigned kHoldFlips = 30u; // a second of the game's frames
     static unsigned held = 0u;
     held = (allowed && select_held) ? held + 1u : 0u;

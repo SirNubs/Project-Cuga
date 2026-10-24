@@ -190,11 +190,11 @@ void register_platform(HleRegistrar &hle) {
             value = 0u;
             break; // 24-hour clock
         case 8u:
-            value = 0u;
-            break; // language: Japanese
+            value = 1u;
+            break; // US experiment: English
         case 9u:
-            value = 0u;
-            break; // confirm button: circle
+            value = 1u;
+            break; // US experiment: confirm button is cross
         default:
             break;
         }

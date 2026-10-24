@@ -1,5 +1,6 @@
 #include "mods/mhp2g_mods.hpp"
 #include "game/key_quests.hpp"
+#include "game/key_quest_archive.hpp"
 #include "settings/settings.hpp"
 
 #include "mods/file_overlay.hpp"
@@ -233,6 +234,9 @@ void attach_disc(IsoImage *disc) {
         std::cerr << "[mods] DATA.BIN's directory could not be read; mods are off\n";
         return;
     }
+    if (std::getenv("MHP2G_US_QOL_TEST"))
+        std::cout << "[qol-test] archive entries=" << s.directory->entries()
+                  << " plain=" << p3rd::plain_archive() << std::endl;
     s.format.set_entries(static_cast<std::uint32_t>(s.directory->entries()));
     s.view = std::make_unique<ArchiveView>(*s.directory, &raw_read);
     s.overlay = std::make_unique<FileOverlay>(FileOverlay::Game{[&s](FileId file) { return s.view->original(file); },
@@ -263,7 +267,7 @@ std::optional<DiscRange> data_bin_on_disc() {
 }
 
 bool serving() {
-    return state().serving || (settings::current().key_quest_stars && state().directory && p3rd::plain_archive());
+    return state().serving || (settings::current().key_quest_stars && state().directory && game::key_quest_files(state().directory->entries(), p3rd::plain_archive()).has_value());
 }
 
 std::uint64_t data_bin_size() {
@@ -276,10 +280,11 @@ std::uint64_t data_bin_size() {
 // Cache whole lists so arbitrary partial reads receive a consistent result.
 std::size_t key_quest_readback(std::uint64_t offset, std::span<std::uint8_t> out, std::size_t count) {
     State &s = state();
-    if (!settings::current().key_quest_stars || !s.directory || !s.view || !p3rd::plain_archive() ||
-        s.directory->entries() != 6602u || count == 0u) return count;
+    if (!settings::current().key_quest_stars || !s.directory || !s.view || count == 0u) return count;
+    const auto files = game::key_quest_files(s.directory->entries(), p3rd::plain_archive());
+    if (!files) return count;
     const Directory &directory = s.layout ? s.layout->directory : *s.directory;
-    for (FileId file = 5310u; file <= 5320u; ++file) {
+    for (FileId file = files->first; file <= files->last; ++file) {
         const auto start = std::uint64_t(directory.blocks[file]) * p3rd::kBlock;
         const auto end = start + directory.size(file);
         if (offset >= end || offset + count <= start) continue;
@@ -287,7 +292,7 @@ std::size_t key_quest_readback(std::uint64_t offset, std::span<std::uint8_t> out
         if (found == s.key_lists.end()) {
             std::vector<std::uint8_t> bytes(static_cast<std::size_t>(directory.size(file)));
             if (s.view->read(start, bytes) != bytes.size()) continue;
-            const auto marked = game::mark_key_quests(bytes);
+            const auto marked = game::mark_stored_key_quests(bytes, directory.blocks[file]);
             std::cout << "[qol] key quest stars: list " << file << ", " << marked << " labels" << std::endl;
             found = s.key_lists.emplace(file, std::move(bytes)).first;
         }

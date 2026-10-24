@@ -7,10 +7,10 @@
 #include <vector>
 
 namespace {
-constexpr std::uint32_t stock = 0x09B015E8u;
-constexpr std::uint32_t pointers = 0x09B01D08u;
-constexpr std::uint32_t menu = 0x09995250u;
-constexpr std::array<std::uint32_t, 5> lists{stock, 0x09B01658u, 0x09B01698u, 0x09B016D8u, 0x09B01710u};
+constexpr std::uint32_t stock = 0x09B069B0u;
+constexpr std::uint32_t pointers = 0x09B070D0u;
+constexpr std::uint32_t menu = 0x09999650u;
+constexpr std::array<std::uint32_t, 5> lists{stock, 0x09B06A20u, 0x09B06A60u, 0x09B06AA0u, 0x09B06AD8u};
 constexpr std::array<std::size_t, 5> lengths{53u, 31u, 31u, 27u, 27u};
 constexpr std::array<std::uint16_t, 5> first{43u, 164u, 25u, 163u, 163u};
 int failures{};
@@ -18,14 +18,14 @@ void check(bool value, const char *message) {
     if (!value) { ++failures; std::cerr << "FAIL: " << message << '\n'; }
 }
 std::vector<std::uint16_t> fixture(psprecomp::GuestMemory &m) {
-    m.store32(0x09A5A580u, 0x336F574Du);
-    m.store32(0x09A5A588u, 0x09A5A580u);
+    m.store32(0x09A5F300u, 0x336F574Du);
+    m.store32(0x09A5F308u, 0x09A5F300u);
     constexpr char name[] = "lobby_task.ovl";
-    std::memcpy(m.raw_pointer(0x09A5A5A0u, sizeof(name)), name, sizeof(name));
-    m.store32(0x09A7B530u, 0x3C02089Cu);
-    m.store32(0x09A7B534u, 0x8C427508u);
-    m.store32(0x09A7B558u, 0x24421D08u);
-    m.store32(0x09A7B564u, 0x8C420000u);
+    std::memcpy(m.raw_pointer(0x09A5F320u, sizeof(name)), name, sizeof(name));
+    m.store32(0x09A803C0u, 0x3C02089Du);
+    m.store32(0x09A803C4u, 0x8C42C558u);
+    m.store32(0x09A803E8u, 0x244270D0u);
+    m.store32(0x09A803F4u, 0x8C420000u);
     m.store32(menu, 0u);
     std::vector<std::uint16_t> expected;
     const auto append = [&expected](std::uint16_t item) {
@@ -85,12 +85,12 @@ int main() {
     fixture(m); // overlay reloaded without an intervening update
     shop.update(m, true);
     check(shop.active(), "overlay reload is detected and reapplied");
-    m.store32(0x09A5A580u, 0u);
+    m.store32(0x09A5F300u, 0u);
     m.store16(stock, 999u);
     shop.update(m, false);
     check(!shop.active() && m.load16(stock) == 999u, "never restores into another overlay");
     fixture(m);
-    m.store32(0x09A7B558u, 0u);
+    m.store32(0x09A803E8u, 0u);
     shop.update(m, true);
     check(!shop.active() && m.load16(stock) == first[0], "unknown code layout is refused");
     fixture(m);
