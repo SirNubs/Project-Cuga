@@ -33,9 +33,16 @@ offer made by the Project Cuga maintainer.
 
 ## Game content
 
-The source repository does not distribute Monster Hunter Portable 2nd G game
-files, extracted assets, generated game-source corpora or compiled overlays.
-Windows binary releases include Cuga's native executable and compiled runtime
-overlay libraries, alongside dependency notices. They do not include original
-PSP executables, game images, extracted assets, saves or personal settings.
-Users must provide their own legally obtained game files and matching patch data.
+Project Cuga does not distribute Monster Hunter Portable 2nd G game files,
+extracted assets, generated game code, or compiled game overlays.
+Users must provide their own legally obtained game files.
+
+
+## KTX2 texture decoding
+
+Basis Universal v2_50, commit 9bebe16726b3a61c8c213eeee3b7cffb462ef34e,
+is used under the Apache License 2.0. Its unmodified transcoder sources are from
+https://github.com/BinomialLLC/basis_universal/tree/9bebe16726b3a61c8c213eeee3b7cffb462ef34e
+The bundled Zstandard decoder is used under its BSD license.
+BasisUniversal-LICENSE.txt and Zstandard-LICENSE.txt accompany this package.
+These libraries decode user-supplied texture packs; no texture pack is bundled.

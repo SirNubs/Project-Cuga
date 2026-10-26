@@ -3,8 +3,8 @@
 // another release, the checks made before copying (the hash, key and file
 // counts, missing images), and the copy, the swap and the backup it makes.
 //
-//   mhp3rd_texture_pack_tests
-//   mhp3rd_texture_pack_tests --check <folder>
+//   mhp2g_texture_pack_tests
+//   mhp2g_texture_pack_tests --check <folder>
 //
 // The second form prints what the menu's import would find in a folder, for
 // example a real pack, and reads nothing but that folder.
@@ -25,18 +25,18 @@
 #include <string>
 #include <thread>
 
-using namespace mhp3rd::gpu;
+using namespace mhp2g::gpu;
 namespace fs = std::filesystem;
 
 // The decoder asks whether its buffer reuse is being measured against the old
 // path; these checks link no frame statistics, so it never is.
-bool mhp3rd::perf::alternate_off(NewPath) {
+bool mhp2g::perf::alternate_off(NewPath) {
     return false;
 }
 
 namespace {
 
-constexpr const char *kGame = "NPJB40001";
+constexpr const char *kGame = "ULJM05500";
 
 int failures = 0;
 
@@ -80,7 +80,7 @@ struct Scratch {
     fs::path root;
     Scratch() {
         std::random_device random;
-        root = fs::temp_directory_path() / ("mhp3rd_texture_pack_tests_" + std::to_string(random()));
+        root = fs::temp_directory_path() / ("mhp2g_texture_pack_tests_" + std::to_string(random()));
         fs::create_directories(root);
     }
     ~Scratch() {
@@ -109,10 +109,10 @@ void test_layouts(const fs::path &root) {
         fs::path pack;
         const char *what;
     } layouts[] = {
-        {root / "a", root / "a" / "textures" / kGame, "textures/NPJB40001 in the chosen folder"},
-        {root / "b", root / "b" / kGame, "NPJB40001 in the chosen folder"},
-        {root / "c", root / "c" / "PSP" / "TEXTURES" / kGame, "PPSSPP's PSP/TEXTURES/NPJB40001"},
-        {root / "d", root / "d" / "psp" / "textures" / "npjb40001", "psp/textures/npjb40001, in another case"},
+        {root / "a", root / "a" / "textures" / kGame, "textures/ULJM05500 in the chosen folder"},
+        {root / "b", root / "b" / kGame, "ULJM05500 in the chosen folder"},
+        {root / "c", root / "c" / "PSP" / "TEXTURES" / kGame, "PPSSPP's PSP/TEXTURES/ULJM05500"},
+        {root / "d", root / "d" / "psp" / "textures" / "uljm05500", "psp/textures/uljm05500, in another case"},
     };
     for (const auto &layout : layouts) {
         make_pack(layout.pack);
@@ -133,12 +133,12 @@ void test_layouts(const fs::path &root) {
 }
 
 void test_games(const fs::path &root) {
-    const std::string listed = std::string(kIni) + "\n[games]\nULJM05800 = true\nNPJB40001 = true\n";
+    const std::string listed = std::string(kIni) + "\n[games]\nULJM05800 = true\nULJM05500 = true\n";
     // Chosen directly.
     const fs::path direct = root / "games" / "ULJM05800";
     make_pack(direct, listed);
     TexturePackCheck c = check_texture_pack(direct, kGame);
-    check(c.ok() && c.made_for == "ULJM05800", "a ULJM05800 pack listing NPJB40001 is taken as made for ULJM05800");
+    check(c.ok() && c.made_for == "ULJM05800", "a ULJM05800 pack listing ULJM05500 is taken as made for ULJM05800");
     // Found under a TEXTURES folder.
     make_pack(root / "games2" / "PSP" / "TEXTURES" / "ULJM05800", listed);
     c = check_texture_pack(root / "games2", kGame);
@@ -148,7 +148,7 @@ void test_games(const fs::path &root) {
     const fs::path other = root / "games3" / "ULJM05800";
     make_pack(other, std::string(kIni) + "\n[games]\nULJM05800 = true\n");
     c = check_texture_pack(other, kGame);
-    check(!c.ok() && c.problem.find("ULJM05800") != std::string::npos, "a ULJM05800 pack without NPJB40001 is refused");
+    check(!c.ok() && c.problem.find("ULJM05800") != std::string::npos, "a ULJM05800 pack without ULJM05500 is refused");
     make_pack(root / "games4" / "ULJM05800");
     c = check_texture_pack(root / "games4" / "ULJM05800", kGame);
     check(!c.ok(), "a ULJM05800 pack without [games] is refused");
@@ -156,7 +156,7 @@ void test_games(const fs::path &root) {
     check(!c.found(), "and is not picked from its parent folder");
     // An override ini named in [games] for this release is read.
     const fs::path overridden = root / "games5" / kGame;
-    make_pack(overridden, std::string(kIni) + "\n[games]\nNPJB40001 = hd.ini\n");
+    make_pack(overridden, std::string(kIni) + "\n[games]\nULJM05500 = hd.ini\n");
     write(overridden / "hd.ini", "[hashes]\n00000000aaaaaaaabbbbbbbb = ui/capcom.png\n");
     c = check_texture_pack(root / "games5", kGame);
     check(c.ok() && c.keys == 5u, "the ini [games] names for this release adds its keys");
@@ -165,10 +165,10 @@ void test_games(const fs::path &root) {
 void test_hashes(const fs::path &root) {
     std::string quick = kIni;
     quick.replace(quick.find("xxh64"), 5, "quick");
-    make_pack(root / "quick" / kGame, quick);
+    make_pack(root / "quick" / kGame, std::string("\xEF\xBB\xBF") + quick);
     TexturePackCheck c = check_texture_pack(root / "quick", kGame);
-    check(c.found() && !c.ok() && c.problem.find("\"quick\" hash") != std::string::npos,
-        "hash = quick is refused with its reason");
+    check(c.ok() && c.hash == TexturePackHash::Quick,
+        "UTF-8 BOM and hash = quick are accepted");
     std::string xxh32 = kIni;
     xxh32.replace(xxh32.find("xxh64"), 5, "xxh32");
     make_pack(root / "xxh32" / kGame, xxh32);
@@ -194,7 +194,7 @@ void test_copy(const fs::path &root) {
     write(textures / ".incomplete-2000-01-01_00-00-00" / "junk", "left by a crash");
 
     const fs::path source = root / "new" / "ULJM05800";
-    make_pack(source, std::string(kIni) + "\n[games]\nNPJB40001 = true\n");
+    make_pack(source, std::string(kIni) + "\n[games]\nULJM05500 = true\n");
     write(source / "maps" / "village.png", "village");
     const TexturePackCheck c = check_texture_pack(source, kGame);
     check(c.ok(), "the new pack passes its checks");
@@ -217,9 +217,9 @@ void test_copy(const fs::path &root) {
     check(install_staged_texture_pack(copy.staging(), textures, kGame, backup_dir, backup, error),
         "the copy is put in place: " + error);
     check(backup == backup_dir / kGame && read(backup / "old.txt") == "the old pack",
-        "the replaced pack moved to .backup/<time>/NPJB40001, whole");
+        "the replaced pack moved to .backup/<time>/ULJM05500, whole");
     check(read(installed / "maps" / "village.png") == "village" && !fs::exists(installed / "old.txt"),
-        "the new pack is installed as NPJB40001");
+        "the new pack is installed as ULJM05500");
     check(!fs::exists(copy.staging()), "no staging folder is left");
     check(texture_pack_backup_directory(textures, std::chrono::system_clock::from_time_t(1'000'000'000)) != backup_dir,
         "a second backup in the same second gets a new folder");
@@ -251,7 +251,7 @@ void test_location(const fs::path &root) {
 #endif
     TexturePackLocation l = texture_pack_location(textures, kGame, "");
     check(l.source == TexturePackLocation::Source::Installed && l.folder == textures / kGame,
-        "the pack is read from textures/NPJB40001 by default");
+        "the pack is read from textures/ULJM05500 by default");
     l = texture_pack_location(textures, kGame, "/somewhere/pack");
     check(l.source == TexturePackLocation::Source::InPlace && l.folder == fs::path("/somewhere/pack"),
         "a pack used in place is read from its folder");
@@ -275,7 +275,7 @@ int check_folder(const char *folder) {
     std::printf("pack     %s\n", c.found() ? c.folder.string().c_str() : "(none)");
     std::printf("layout   %s\n", c.layout.c_str());
     if (!c.made_for.empty()) std::printf("made for %s\n", c.made_for.c_str());
-    std::printf("hash     %s%s\n", c.hash == TexturePackHash::Xxh64 ? "xxh64" : "xxh32",
+    std::printf("hash     %s%s\n", texture_pack_hash_name(c.hash),
         c.ignore_address ? ", ignoreAddress" : "");
     std::printf("keys     %zu\n", c.keys);
     std::printf("images   %zu\n", c.images);
@@ -362,6 +362,49 @@ void test_dxt_decode() {
     check(texture_key(memory, texture) == before, "a DXT texture's key does not follow the CLUT");
 }
 
+
+void test_png_replacement(const fs::path &root) {
+    const fs::path folder = root / "real-png";
+    psprecomp::GuestMemory memory;
+    TextureState texture;
+    texture.address = 0x08800000u;
+    texture.width = 4u; texture.height = 4u; texture.buffer_width = 4u;
+    texture.format = TextureFormat::Dxt1;
+    for (unsigned i=0;i<8;++i) memory.store8(texture.address+i,static_cast<std::uint8_t>(i*17));
+    TexturePackOptions options;
+    options.ignore_address = true;
+    TexturePackKey key;
+    std::uint32_t width=0,height=0;
+    check(compute_texture_pack_key(memory,texture,0,options,key,width,height),"FUC source texture key computed");
+    write(folder / "textures.ini", "[options]\nhash=xxh64\nignoreAddress=true\n[hashes]\n" +
+        format_texture_pack_key(key) + "=UI/HD.PNG\n");
+    const unsigned char png[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,8,0,0,0,8,8,6,0,0,0,196,15,190,139,0,0,0,19,73,68,65,84,120,156,99,248,207,240,255,63,62,204,48,50,20,0,0,131,230,191,65,7,103,93,239,0,0,0,0,73,69,78,68,174,66,96,130};
+    fs::create_directories(folder / "ui");
+    std::ofstream image(folder / "ui/hd.png",std::ios::binary);
+    image.write(reinterpret_cast<const char *>(png),sizeof(png));image.close();
+    std::string error;
+    auto pack=TexturePack::open(folder,kGame,error);
+    check(pack!=nullptr,"PNG replacement pack opens");
+    if(!pack)return;
+    auto replacement=pack->find(memory,texture,0);
+    check(replacement!=nullptr,"game texture matches HD pack key");
+    if(!replacement)return;
+    pack->request(*replacement);
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+    while(std::chrono::steady_clock::now()<deadline &&
+        (replacement->state.load()==Replacement::State::Unloaded || replacement->state.load()==Replacement::State::Queued))
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    check(replacement->state.load()==Replacement::State::Decoded,"background PNG decoder handles filename case differences");
+    if(replacement->state.load()!=Replacement::State::Decoded)return;
+    check(replacement->width==8 && replacement->height==8 && replacement->pixels.size()==256,
+        "higher-resolution replacement decoded at HD dimensions");
+    check(replacement->pixels[0]==255 && replacement->pixels[1]==0 && replacement->pixels[2]==255,
+        "replacement pixels retain expected colors");
+    pack->consumed(*replacement);
+    check(replacement->state.load()==Replacement::State::Resident && replacement->pixels.empty(),
+        "renderer upload handoff releases decoded pixels");
+}
+
 int main(int argc, char **argv) {
     if (argc == 3 && std::string(argv[1]) == "--check") return check_folder(argv[2]);
     const Scratch scratch;
@@ -371,6 +414,7 @@ int main(int argc, char **argv) {
     test_copy(scratch.root);
     test_location(scratch.root);
     test_dxt_decode();
+    test_png_replacement(scratch.root);
     std::printf("%s\n", failures == 0 ? "all texture pack checks passed" : "texture pack checks FAILED");
     return failures == 0 ? 0 : 1;
 }

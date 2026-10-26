@@ -1,4 +1,16 @@
 set(MHP2G_PROFILE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+include(cmake/fuc_runtime_hooks.cmake)
+
+# Basis Universal's Apache-2.0 transcoder handles KTX2 ETC1S/UASTC packs;
+# its bundled BSD-licensed Zstandard decoder handles supercompressed levels.
+enable_language(C)
+add_library(mhp2g_basis STATIC
+    third_party/basis_universal/transcoder/basisu_transcoder.cpp
+    third_party/basis_universal/zstd/zstddeclib.c)
+set_target_properties(mhp2g_basis PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(mhp2g_basis SYSTEM PUBLIC
+    "${MHP2G_PROFILE_DIR}/third_party/basis_universal/transcoder")
+
 
 # The AOT corpus is derived from the user's executable and is not committed.
 # Until scripts/generate.sh has produced it, link an empty registry instead.
@@ -296,10 +308,12 @@ endif()
 # Poke (a renderer switch, a new library's headers) do not change its
 # compile commands and rebuild all of it. Its objects still link straight into
 # the executable, which exports their symbols to the overlay libraries.
-add_library(mhp2g_generated OBJECT ${MHP2G_GENERATED})
+mhp2g_guard_fuc_gather(MHP2G_GUARDED_GENERATED ${MHP2G_GENERATED})
+add_library(mhp2g_generated OBJECT ${MHP2G_GUARDED_GENERATED})
+set_source_files_properties(${MHP2G_GUARDED_GENERATED} PROPERTIES COMPILE_OPTIONS "${MHP2G_GENERATED_OPTIONS}")
 target_include_directories(mhp2g_generated PRIVATE
     "${PROJECT_SOURCE_DIR}/include"
-    "${MHP2G_PROFILE_DIR}/generated")
+    "${MHP2G_PROFILE_DIR}/generated" "${MHP2G_PROFILE_DIR}/host")
 set_target_properties(mhp2g_generated PROPERTIES JOB_POOL_COMPILE psprecomp_generated)
 
 # An Android app is a shared library, libmain.so, that SDL's Java activity
@@ -358,7 +372,7 @@ target_include_directories(Poke PRIVATE
     "${MHP2G_PROFILE_DIR}/host"
     "${MHP2G_PROFILE_DIR}/third_party"
     "${MHP2G_PROFILE_DIR}/generated")
-target_link_libraries(Poke PRIVATE psprecomp_core ${CMAKE_DL_LIBS})
+target_link_libraries(Poke PRIVATE mhp2g_basis psprecomp_core ${CMAKE_DL_LIBS})
 if(WIN32)
     # The ad hoc client's and server's sockets, and the list of interfaces;
     # CommandLineToArgvW for the arguments as UTF-8.
@@ -660,7 +674,7 @@ target_include_directories(mhp2g_texture_pack_tests PRIVATE
     "${MHP2G_PROFILE_DIR}/host"
     "${MHP2G_PROFILE_DIR}/host/gpu"
     "${MHP2G_PROFILE_DIR}/third_party")
-target_link_libraries(mhp2g_texture_pack_tests PRIVATE psprecomp_core Threads::Threads)
+target_link_libraries(mhp2g_texture_pack_tests PRIVATE mhp2g_basis psprecomp_core Threads::Threads)
 set_target_properties(mhp2g_texture_pack_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 if(PSPRECOMP_BUILD_TESTS)
     add_test(NAME mhp2g_texture_pack_tests COMMAND mhp2g_texture_pack_tests)
@@ -846,7 +860,7 @@ target_include_directories(mhp2g_path_tests PRIVATE
     "${MHP2G_PROFILE_DIR}/host"
     "${MHP2G_PROFILE_DIR}/host/gpu"
     "${MHP2G_PROFILE_DIR}/third_party")
-target_link_libraries(mhp2g_path_tests PRIVATE psprecomp_core Threads::Threads)
+target_link_libraries(mhp2g_path_tests PRIVATE mhp2g_basis psprecomp_core Threads::Threads)
 if(WIN32)
     target_link_libraries(mhp2g_path_tests PRIVATE shell32)
 endif()
@@ -910,7 +924,8 @@ function(mhp2g_add_overlay meta_path)
     configure_file("${MHP2G_PROFILE_DIR}/host/overlay_module.cpp.in" "${entry_point}" @ONLY)
 
     set(target "overlay_${MHP2G_OVERLAY_PREFIX}")
-    add_library(${target} MODULE ${sources} "${entry_point}")
+    mhp2g_guard_fuc_gather(guarded_sources ${sources})
+    add_library(${target} MODULE ${guarded_sources} "${entry_point}")
     # Headers only: linking psprecomp_core would give the module its own copy of
     # the runtime state the host already owns.
     target_include_directories(${target} PRIVATE
@@ -1138,4 +1153,21 @@ target_include_directories(mhp2g_qol_quest_tests PRIVATE "${MHP2G_PROFILE_DIR}/h
 set_target_properties(mhp2g_qol_quest_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 if(BUILD_TESTING)
     add_test(NAME mhp2g_qol_quest_tests COMMAND mhp2g_qol_quest_tests)
+endif()
+
+# Runtime FUC hooks: synthetic instruction tests need no game assets.
+add_executable(mhp2g_fuc_runtime_tests tests/fuc_runtime_tests.cpp)
+target_include_directories(mhp2g_fuc_runtime_tests PRIVATE "${MHP2G_PROFILE_DIR}/host")
+target_link_libraries(mhp2g_fuc_runtime_tests PRIVATE psprecomp_core)
+set_target_properties(mhp2g_fuc_runtime_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+if(PSPRECOMP_BUILD_TESTS)
+    add_test(NAME mhp2g_fuc_runtime_tests COMMAND mhp2g_fuc_runtime_tests)
+endif()
+
+# Camera estimation must reject moving-object outliers even when rotations tie.
+add_executable(mhp2g_camera_consensus_tests tests/camera_consensus_tests.cpp host/gpu/frame_interpolation.cpp)
+target_include_directories(mhp2g_camera_consensus_tests PRIVATE "${MHP2G_PROFILE_DIR}/host" "${PROJECT_SOURCE_DIR}/include")
+set_target_properties(mhp2g_camera_consensus_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+if(PSPRECOMP_BUILD_TESTS)
+    add_test(NAME mhp2g_camera_consensus_tests COMMAND mhp2g_camera_consensus_tests)
 endif()

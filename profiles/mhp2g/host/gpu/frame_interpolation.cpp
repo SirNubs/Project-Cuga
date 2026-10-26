@@ -169,12 +169,35 @@ const Matching &Matcher::match(
         samples.push_back({rotation_angle_degrees(identity, motion), motion});
     }
     if (!samples.empty()) {
-        const auto middle = samples.begin() + static_cast<std::ptrdiff_t>(samples.size() / 2u);
-        std::nth_element(
-            samples.begin(), middle, samples.end(), [](const Sample &a, const Sample &b) { return a.turn < b.turn; });
+        // A median of rotation angles alone cannot distinguish a moving
+        // character from scenery when their turns tie (especially at zero).
+        // Find the component-wise median motion, then select an actual sample
+        // nearest to it. Keeping a real sample preserves a valid transform;
+        // the medians only rank candidates and are never used as a matrix.
+        std::array<float, 12> median{};
+        std::vector<float> values(samples.size());
+        for (std::size_t component = 0; component < median.size(); ++component) {
+            const std::size_t matrix_index = component / 3u * 4u + component % 3u;
+            for (std::size_t i = 0; i < samples.size(); ++i) values[i] = samples[i].motion[matrix_index];
+            const auto middle = values.begin() + static_cast<std::ptrdiff_t>(values.size() / 2u);
+            std::nth_element(values.begin(), middle, values.end());
+            median[component] = *middle;
+        }
+        const float distance_scale = std::max(1.0f, thresholds.max_camera_distance);
+        const auto disagreement = [&](const Sample &sample) {
+            float score = 0.0f;
+            for (std::size_t component = 0; component < median.size(); ++component) {
+                const std::size_t matrix_index = component / 3u * 4u + component % 3u;
+                const float scale = component >= 9u ? distance_scale : 1.0f;
+                score += std::fabs(sample.motion[matrix_index] - median[component]) / scale;
+            }
+            return score;
+        };
+        const auto best = std::min_element(samples.begin(), samples.end(),
+            [&](const Sample &a, const Sample &b) { return disagreement(a) < disagreement(b); });
         out.camera_found = true;
-        out.camera_angle_degrees = middle->turn;
-        out.camera = middle->motion;
+        out.camera_angle_degrees = best->turn;
+        out.camera = best->motion;
         out.camera_distance = std::sqrt(
             out.camera[12] * out.camera[12] + out.camera[13] * out.camera[13] + out.camera[14] * out.camera[14]);
     }

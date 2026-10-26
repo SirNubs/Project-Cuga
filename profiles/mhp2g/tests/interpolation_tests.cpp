@@ -3,7 +3,7 @@
 // present and what each present shows, and how the frame rate steps down and
 // back up. Needs no game data and no GPU.
 //
-//   mhp3rd_interpolation_tests
+//   mhp2g_interpolation_tests
 #include "gpu/frame_interpolation.hpp"
 #include "gpu/frame_pacing.hpp"
 
@@ -14,8 +14,8 @@
 #include <cstring>
 #include <vector>
 
-using namespace mhp3rd::gpu;
-using namespace mhp3rd::gpu::interpolation;
+using namespace mhp2g::gpu;
+using namespace mhp2g::gpu::interpolation;
 
 namespace {
 
@@ -340,7 +340,7 @@ void continuous_motion() {
         "after forget_motion the plain limits apply again");
 }
 
-using namespace mhp3rd::gpu::pacing;
+using namespace mhp2g::gpu::pacing;
 
 void rates() {
     check(presents_per_frame(45.0) == 1.5 && presents_per_frame(60.0) == 2.0 && presents_per_frame(90.0) == 3.0 &&

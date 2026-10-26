@@ -1,4 +1,6 @@
 #include "texture_pack.hpp"
+#include "ktx2_decode.hpp"
+#include "texture_pack_quick.hpp"
 
 #include "platform/utf8_path.hpp"
 
@@ -55,6 +57,7 @@ bool texture_pack_trace() {
 namespace {
 
 std::string trim(std::string_view text) {
+    if (text.starts_with("\xEF\xBB\xBF")) text.remove_prefix(3); // UTF-8 BOM from Windows editors
     std::size_t begin = 0u;
     std::size_t end = text.size();
     while (begin < end && std::isspace(static_cast<unsigned char>(text[begin])) != 0) ++begin;
@@ -140,7 +143,8 @@ bool is_paletted(TextureFormat format) {
         format == TextureFormat::Clut32;
 }
 
-std::uint32_t data_hash(const std::uint8_t *data, std::size_t size, TexturePackHash hash) {
+std::uint32_t data_hash(const std::uint8_t *data, std::size_t size, TexturePackHash hash, std::uint32_t guest_address) {
+    if (hash == TexturePackHash::Quick) return texture_pack_quick(data, size, guest_address);
     // xxh64 keys keep the low 32 bits of the 64-bit hash.
     return hash == TexturePackHash::Xxh32 ? XXH32(data, size, kDataSeed)
                                           : static_cast<std::uint32_t>(XXH64(data, size, kDataSeed));
@@ -222,7 +226,7 @@ bool compute_texture_pack_key(const GuestMemory &memory, const TextureState &tex
         }
         const std::uint8_t *data = memory.raw_pointer(address, size);
         if (data == nullptr) return false;
-        hash = data_hash(data, size, options.hash);
+        hash = data_hash(data, size, options.hash, address);
     } else {
         // Rows narrower than the buffer: each row is hashed on its own and the
         // row hashes are folded together.
@@ -232,7 +236,7 @@ bool compute_texture_pack_key(const GuestMemory &memory, const TextureState &tex
         const std::uint8_t *data = memory.raw_pointer(address, span);
         if (data == nullptr) return false;
         for (std::uint32_t row = 0; row < height; ++row)
-            hash = (hash * 11u) ^ data_hash(data + static_cast<std::size_t>(row) * stride, row_bytes, options.hash);
+            hash = (hash * 11u) ^ data_hash(data + static_cast<std::size_t>(row) * stride, row_bytes, options.hash, address + row * stride);
     }
 
     // Dimension word: log2 height in bits 8-11, log2 width in bits 0-3.
@@ -391,14 +395,14 @@ bool TexturePack::load_ini(const std::filesystem::path &path, bool is_override, 
             const std::string option = lower(name);
             if (option == "hash") {
                 const std::string kind = lower(value);
-                if (kind == "xxh64")
+                if (kind == "quick")
+                    options_.hash = TexturePackHash::Quick;
+                else if (kind == "xxh64")
                     options_.hash = TexturePackHash::Xxh64;
                 else if (kind == "xxh32")
                     options_.hash = TexturePackHash::Xxh32;
                 else if (!value.empty() || !is_override) {
-                    // "quick" was the format's first hash; packs made with it
-                    // are rare, and it is not implemented here.
-                    error = "textures.ini: hash = " + value + " is not supported (xxh64 and xxh32 are)";
+                    error = "textures.ini: hash = " + value + " is not supported (quick, xxh64 and xxh32 are)";
                     return false;
                 }
                 hash_given = hash_given || !value.empty();
@@ -481,7 +485,7 @@ void TexturePack::scan_hash_named_files() {
     for (const auto &entry : std::filesystem::directory_iterator(directory_, ec)) {
         if (!entry.is_regular_file(ec)) continue;
         const std::filesystem::path &path = entry.path();
-        if (lower(path_to_utf8(path.extension())) != ".png") continue;
+        if (const auto ext = lower(path_to_utf8(path.extension())); ext != ".png" && ext != ".ktx2") continue;
         const std::string stem = path_to_utf8(path.stem());
         if (!is_hex_name(stem)) continue;
         TexturePackKey key;
@@ -615,16 +619,22 @@ void TexturePack::decode(Replacement &replacement) {
         if (!folded.empty()) bytes = read_file(folded);
     }
     int width = 0, height = 0, channels = 0;
-    stbi_uc *image = bytes.empty()
-        ? nullptr
-        : stbi_load_from_memory(bytes.data(), static_cast<int>(bytes.size()), &width, &height, &channels, 4);
+    const bool ktx2 = is_ktx2(bytes);
+    std::vector<std::uint8_t> transcoded;
+    std::string decode_error;
+    stbi_uc *image = nullptr;
+    if (ktx2) {
+        if (decode_ktx2(bytes, transcoded, width, height, decode_error)) image = transcoded.data();
+    } else if (!bytes.empty()) {
+        image = stbi_load_from_memory(bytes.data(), static_cast<int>(bytes.size()), &width, &height, &channels, 4);
+    }
     if (image == nullptr || width <= 0 || height <= 0 || width > kMaxImageSide || height > kMaxImageSide) {
         std::cerr << "[texpack] cannot use " << replacement.name << ": "
                   << (bytes.empty()             ? "missing or unreadable"
-                             : image == nullptr ? stbi_failure_reason()
+                             : image == nullptr ? (ktx2 ? decode_error.c_str() : stbi_failure_reason())
                                                 : "too large")
                   << "\n";
-        if (image != nullptr) stbi_image_free(image);
+        if (image != nullptr && !ktx2) stbi_image_free(image);
         replacement.state.store(Replacement::State::Failed, std::memory_order_release);
         return;
     }
@@ -643,7 +653,7 @@ void TexturePack::decode(Replacement &replacement) {
         std::memcpy(pixels.data() + static_cast<std::size_t>(row) * full_width * 4u,
             image + static_cast<std::size_t>(row) * static_cast<std::size_t>(width) * 4u,
             static_cast<std::size_t>(std::min<std::uint32_t>(static_cast<std::uint32_t>(width), full_width)) * 4u);
-    stbi_image_free(image);
+    if (!ktx2) stbi_image_free(image);
 
     replacement.width = full_width;
     replacement.height = full_height;

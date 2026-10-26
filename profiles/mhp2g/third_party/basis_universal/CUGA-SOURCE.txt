@@ -1,0 +1,3 @@
+Basis Universal v2_50
+https://github.com/BinomialLLC/basis_universal/tree/9bebe16726b3a61c8c213eeee3b7cffb462ef34e
+Unmodified transcoder and Zstandard decoder sources.

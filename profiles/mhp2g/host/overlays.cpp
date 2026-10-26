@@ -313,6 +313,21 @@ bool unsupported_instruction_hook(Runtime &runtime, AllegrexContext &, std::uint
 
 } // namespace
 
+// The modloader changes code before the ordinary dispatch miss can identify
+// it by hash. Capture the exact original corpus at the final read instead.
+void prepare_fuc_overlay(Runtime &runtime, const AllegrexContext &ctx) {
+    auto &memory = runtime.memory();
+    if (memory.load32(ctx.gpr[29] + 4u) == 0x20000u) return; // intermediate chunk
+    const auto file = memory.load32(0x08A35890u);
+    if (file != 46u && file != 50u && file != 51u && file != 53u) return;
+    constexpr auto slot = 0x09A5A580u;
+    revalidate_overlays(runtime);
+    if (const auto found = installed_headers().find(slot);
+        found != installed_headers().end() && found->second == header_hash(memory, slot)) return;
+    if (install_overlay_for(runtime, slot))
+        std::cout << "[fuc] prepared AOT overlay before runtime patches, file " << file << "\n";
+}
+
 void revalidate_overlays(Runtime &runtime) {
     for (auto it = installed_overlays().begin(); it != installed_overlays().end();) {
         const std::uint32_t slot_start = it->first;

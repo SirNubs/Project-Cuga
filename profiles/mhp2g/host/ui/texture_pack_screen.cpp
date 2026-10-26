@@ -11,6 +11,14 @@
 #include "install/user_data.hpp"
 #include "settings/settings.hpp"
 
+#if defined(MHP2G_ANDROID_APP)
+#include "platform/document_texture_import.hpp"
+#include <array>
+#include <cerrno>
+#include <fstream>
+#include <unistd.h>
+#endif
+
 #include "imgui.h"
 
 #include <chrono>
@@ -32,7 +40,7 @@ using gpu::TexturePackCheck;
 using gpu::TexturePackCopy;
 using gpu::TexturePackLocation;
 
-enum class Stage { Closed, Choose, Checking, Review, Copying, Result };
+enum class Stage { Closed, Choose, Reading, Checking, Review, Copying, Result };
 
 // What the review screen shows: the pack found, and the one in use now.
 struct Review {
@@ -67,6 +75,10 @@ struct State {
     bool focus{};
     bool focus_row{};
     std::chrono::steady_clock::time_point copy_started;
+#if defined(MHP2G_ANDROID_APP)
+    fs::path android_staging;
+    std::future<std::string> android_read;
+#endif
 };
 
 State &state() {
@@ -106,6 +118,14 @@ void close() {
     s.stage = Stage::Closed;
     s.browser.reset();
     s.focus_row = true;
+#if defined(MHP2G_ANDROID_APP)
+    if (s.checking.valid()) s.checking.wait();
+    if (!s.android_staging.empty()) {
+        std::error_code ec;
+        fs::remove_all(s.android_staging, ec);
+        s.android_staging.clear();
+    }
+#endif
 }
 
 void focus_first() {
@@ -126,8 +146,91 @@ std::string count(std::size_t n, const char *one, const char *many) {
     return std::to_string(n) + " " + (n == 1u ? one : many);
 }
 
+void start_check(const fs::path &chosen);
+void finish(Outcome outcome);
+
+#if defined(MHP2G_ANDROID_APP)
+bool read_texture_document(const std::string &uri, const fs::path &target, std::string &error) {
+    const int fd = android::open_document(uri, "r");
+    if (fd < 0) {
+        error = "Android could not open a texture file. Check the selected folder's access.";
+        return false;
+    }
+    std::ofstream out(target, std::ios::binary | std::ios::trunc);
+    bool ok = static_cast<bool>(out);
+    std::array<char, 65536> buffer{};
+    while (ok) {
+        const ssize_t bytes = ::read(fd, buffer.data(), buffer.size());
+        if (bytes < 0 && errno == EINTR) continue;
+        if (bytes <= 0) {
+            ok = bytes == 0;
+            break;
+        }
+        out.write(buffer.data(), bytes);
+        ok = static_cast<bool>(out);
+    }
+    ::close(fd);
+    out.close();
+    ok = ok && !out.fail();
+    if (!ok) error = "Could not copy a texture file. Check free space and folder access.";
+    return ok;
+}
+
+void reading_screen() {
+    State &s = state();
+    section("Import texture pack");
+    indented("Reading the selected texture pack. Large packs can take a while; keep Cuga open.");
+    const double t = ImGui::GetTime();
+    progress_bar(static_cast<float>(0.5 + 0.5 * std::sin(t * 3.0)), "Reading from Android storage");
+    if (s.android_read.valid() &&
+        s.android_read.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        const std::string error = s.android_read.get();
+        if (error.empty()) {
+            start_check(s.android_staging);
+        } else {
+            Outcome outcome;
+            outcome.error = error;
+            finish(std::move(outcome));
+        }
+    }
+}
+#endif
+
 void open_browser() {
     State &s = state();
+#if defined(MHP2G_ANDROID_APP)
+    // SAF grants access to the selected folder only, without broad storage
+    // permission. The renderer later reads an installed private copy.
+    if (s.checking.valid()) s.checking.wait();
+    if (!s.android_staging.empty()) {
+        std::error_code ec;
+        fs::remove_all(s.android_staging, ec);
+        s.android_staging.clear();
+    }
+    const auto tree = android::pick_folder();
+    if (!tree) {
+        close();
+        return;
+    }
+    std::error_code ec;
+    const fs::path parent = textures_root() / ".android-import";
+    fs::create_directories(parent, ec);
+    s.android_staging = parent / std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const fs::path staging = s.android_staging;
+    const std::string uri = android::tree_root(*tree);
+    s.android_read = std::async(std::launch::async, [uri, staging] {
+        std::string error;
+        try {
+            const android::TextureDocuments documents{android::list_folder, read_texture_document};
+            android::import_texture_documents(documents, uri, staging, error);
+        } catch (const std::exception &) {
+            error = "Could not read the texture pack. Check folder access and available storage.";
+        }
+        return error;
+    });
+    go(Stage::Reading);
+    return;
+#else
     FileBrowser::Options options;
     options.extensions = {};
     options.filter_name = "folders";
@@ -147,6 +250,7 @@ void open_browser() {
     }
     s.browser = std::make_unique<FileBrowser>(start, std::move(options));
     go(Stage::Choose);
+#endif
 }
 
 void start_check(const fs::path &chosen) {
@@ -187,9 +291,7 @@ bool browse(bool back) {
 #if defined(MHP2G_ANDROID_APP)
     indented("Import: open the pack's folder, the one that holds textures.ini, or choose a folder that holds it, "
              "such as PPSSPP's PSP/TEXTURES.");
-    indented("On Android this lists only folders Project Cuga can read by itself, which leaves out Downloads and SD "
-             "cards. Importing through Android's file picker is not supported yet.",
-        colors::kTextDim);
+    indented("Choose the extracted folder containing textures.ini in Android's folder picker.", colors::kTextDim);
 #else
     indented("Import: open the pack's folder, the one that holds textures.ini, or choose a folder that holds it, "
              "such as PPSSPP's PSP/TEXTURES. You can also drop the folder on the window.");
@@ -256,6 +358,15 @@ void finish(Outcome outcome) {
     State &s = state();
     s.outcome = std::move(outcome);
     go(Stage::Result);
+#if defined(MHP2G_ANDROID_APP)
+    // The checker/copy worker has finished before reaching Result. Release
+    // the provider copy now, even if the player exits without pressing Done.
+    if (!s.android_staging.empty()) {
+        std::error_code ec;
+        fs::remove_all(s.android_staging, ec);
+        s.android_staging.clear();
+    }
+#endif
 }
 
 void use_in_place() {
@@ -308,7 +419,7 @@ void review_screen(bool back) {
         info_row("Folder", utf8(c.folder));
         if (c.keys > 0u) {
             info_row("Textures",
-                count(c.keys, "key", "keys") + ", hash " + (c.hash == gpu::TexturePackHash::Xxh64 ? "xxh64" : "xxh32") +
+                count(c.keys, "key", "keys") + ", hash " + gpu::texture_pack_hash_name(c.hash) +
                     (c.ignore_address ? ", addresses ignored" : ""));
             info_row("Images",
                 count(c.images, "file", "files") + ", " + human_size(c.bytes) + " in all " +
@@ -346,7 +457,7 @@ void review_screen(bool back) {
         if (installed_exists) copy_note += " The pack there now moves to textures/.backup; nothing is deleted.";
         if (!room)
             copy_note = "Not enough free space: the copy needs " + human_size(needed) + " and " +
-                human_size(*r.free_space) + " is free. Use it where it is instead.";
+                human_size(*r.free_space) + " is free. Free some space or choose a smaller pack.";
         if (is_installed) copy_note = "This is the installed pack already.";
         const char *label = installed_exists ? "Copy and replace" : "Copy into Project Cuga's data folder";
         // The focus starts on the first thing the player can do; the rows
@@ -355,6 +466,7 @@ void review_screen(bool back) {
         if (button_row(label, {!room || is_installed, {}, copy_note},
                 installed_exists ? colors::kAccentBright : colors::kText))
             start_copy();
+#if !defined(MHP2G_ANDROID_APP)
         const bool in_use = r.is_current && r.current.source != TexturePackLocation::Source::Variable;
         const std::string place_note = in_use ? "This pack is the one in use already."
                                               : "Reads the pack from its folder and copies nothing, saving " +
@@ -362,6 +474,7 @@ void review_screen(bool back) {
                 (installed_exists ? " The installed pack is kept, unused." : "");
         focus_first();
         if (button_row("Use it where it is", {in_use, {}, place_note})) use_in_place();
+#endif
     }
     focus_first();
     if (button_row("Choose another folder", {false, {}, "Back to the folders."})) open_browser();
@@ -505,8 +618,14 @@ void texture_pack_rows() {
     settings::Settings &settings = settings::current();
     if (button_row("Import texture pack…",
             {false, {},
-                "Install an HD texture pack from a folder: the one that holds textures.ini, or one that holds it "
-                "in textures/NPJB40001 or PSP/TEXTURES. It is checked first; the pack it replaces is kept."}))
+#if defined(MHP2G_ANDROID_APP)
+                "Choose the extracted pack folder containing textures.ini in Android's folder picker. "
+                "It is checked before installation; the previous pack is backed up."
+#else
+                "Install an HD texture pack from a folder containing textures.ini or PSP/TEXTURES. "
+                "It is checked first; the previous pack is backed up."
+#endif
+            }))
         open_browser();
     if (button_row("Open the textures folder",
             {false, {}, "Show the textures folder in the data folder, where imported packs go."}))
@@ -528,7 +647,7 @@ bool texture_pack_screen_open() {
 }
 
 bool texture_pack_import_busy() {
-    return state().stage == Stage::Copying;
+    return state().stage == Stage::Copying || state().stage == Stage::Reading;
 }
 
 bool texture_pack_screen(bool back) {
@@ -538,6 +657,11 @@ bool texture_pack_screen(bool back) {
         return false;
     case Stage::Choose:
         return browse(back);
+    case Stage::Reading:
+#if defined(MHP2G_ANDROID_APP)
+        reading_screen();
+#endif
+        break;
     case Stage::Checking:
         checking_screen(back);
         break;
